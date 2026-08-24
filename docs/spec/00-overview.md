@@ -1,20 +1,27 @@
 # 00 - Tổng Quan Dự Án (Social QA Auto-Responder - Tourism Edition)
 
 ## 1. Giới Thiệu
-Dự án **Social QA Auto-Responder** là hệ thống trả lời tự động tích hợp đa kênh (Zalo OA, Facebook Messenger, Telegram) được tùy chỉnh chuyên biệt cho **ngành Du lịch & Dịch vụ**. Hệ thống sử dụng công nghệ LLM (RAG) kết hợp với **Persona Roleplay** (Đóng vai theo thông tin cá nhân) để cung cấp tư vấn tự nhiên, cá nhân hóa cho khách hàng về các Tour, Ưu đãi, và Lịch trình.
+Dự án **Social QA Auto-Responder** là giải pháp phần mềm tự động hóa phản hồi khách hàng đa kênh (Zalo OA, Facebook Messenger, Telegram), được tùy chỉnh chuyên biệt cho **ngành Du lịch, Tour & Khuyến mãi**. Hệ thống kết hợp công nghệ **RAG (Retrieval-Augmented Generation)** và **Persona Roleplay** giúp AI tự động tư vấn lịch trình, giá bán, hạn chót ưu đãi theo đúng phong cách nói chuyện của từng nhân viên sale.
 
-## 2. Bài Toán Cốt Lõi
-1. **Unified Workspace**: Nhân viên sale không cần mở nhiều tab. Chat, Quản lý Tour, và Thông tin cá nhân (Persona) được gộp chung vào một màn hình duy nhất.
-2. **Structured Tourism Data**: Khác với RAG thông thường (chỉ là text), tri thức ở đây được cấu trúc hóa mạnh mẽ thành các Tour/Ưu đãi với các thông số: Giá tiền, Ngày bắt đầu, Ngày kết thúc.
-3. **Persona Roleplay**: AI không chỉ đọc dữ liệu mà còn "nhập vai". Nhân viên cấu hình thông tin cá nhân (tên, kinh nghiệm, giọng điệu), AI sẽ mạo danh nhân viên đó để nói chuyện với khách hàng, tạo cảm giác thân thiện và đáng tin cậy.
+## 2. Các Phân Hệ Màn Hình Cốt Lõi (Core UI Modules)
 
-## 3. Kiến Trúc Tổng Thể (High-Level Architecture)
-- **Frontend**: Giao diện Web App tối giản, chuyên nghiệp kiểu Cockpit, tập trung quản lý hội thoại đa kênh và tri thức dạng mở rộng (Accordion).
-- **Core AI / RAG Engine**: Xử lý dữ liệu đa chiều (Văn bản + Siêu dữ liệu như Ngày/Giá), nhúng vào Vector Database (PostgreSQL + `pgvector`), prompt injection kết hợp Persona.
-- **Message Broker & Workers**: Redis Queue / BullMQ để đảm bảo thời gian phản hồi cực nhanh (chống timeout Webhook từ Meta/Zalo).
+Hệ thống được thiết kế theo phong cách **Cockpit Data-Dense** tối giản, chuyên nghiệp với thanh **Global Navigation Sidebar (80px)** cố định ở bên trái cho phép chuyển đổi tức thì giữa 3 phân hệ:
 
-## 4. Công Nghệ Sử Dụng (Dự Kiến)
-- **Frontend**: React (Vite / Next.js) + Tailwind CSS (Style Clinical).
-- **Backend**: Node.js / Python (FastAPI).
-- **Database**: PostgreSQL (với extension `pgvector` lưu trữ Embedding) + Redis.
-- **LLM**: Gemini Flash (hoặc OpenAI).
+1. **Màn Hình Chat Dashboard & Human Takeover** (`04-chat-dashboard.md`):
+   - Bố cục 3 cột (20% Inbox - 50% Khung Chat - 30% Control Panel).
+   - Gắn nhãn **Confidence Score** trên mỗi tin nhắn của AI.
+   - Công tắc **Human Takeover** nổi bật giúp nhân viên giành quyền chat bất cứ lúc nào.
+
+2. **Màn Hình Quản Lý Tri Thức & Persona (Settings Page)** (`01-knowledge-base-management.md`):
+   - Trang riêng biệt quản lý dữ liệu Tour / Ưu đãi theo mô hình **Accordion List (Hàng ngang thu gọn / mở rộng)**.
+   - Quản lý thông tin **Persona Roleplay** (Tên nhân viên, kinh nghiệm, giọng điệu) để AI giả lập phong cách tư vấn.
+
+3. **Màn Hình Tích Hợp Kênh (Settings Page)** (`03-channel-integration.md`):
+   - Danh sách các nền tảng chat (Zalo OA, Messenger, Telegram).
+   - Quản lý trạng thái kết nối với các nút `Authorize`, `Connected`, và `Disconnect`.
+
+## 3. Kiến Trúc Kỹ Thuật (Technical Architecture)
+- **Frontend**: Single Page Application (SPA), Vanilla CSS / Tailwind với hệ màu Clinical (Charcoal `#18181B`, Sapphire Accent `#2563EB`, Whisper Border `rgba(226,232,240,0.5)`).
+- **Backend API**: Node.js / Python FastAPI.
+- **Data & Vector Store**: PostgreSQL với extension `pgvector` để lưu trữ Embeddings của các Tour & Ưu đãi.
+- **Async Queue**: Redis / BullMQ xử lý Webhook bất đồng bộ (tránh timeout 2s từ Zalo/Meta).

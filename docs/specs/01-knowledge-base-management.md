@@ -1,36 +1,37 @@
-# 01 - Phân Hệ Quản Lý & Xử Lý Tri Thức (Knowledge Base Management)
+# 01 - Phân Hệ Quản Lý Tri Thức & Persona (Knowledge Base & Persona)
 
 ## 1. Mục Đích
-Cho phép người dùng upload tài liệu thô, hệ thống xử lý để bóc tách thành các đơn vị tri thức nhỏ (chunks) và nhúng (embedding) vào Vector Database.
+Trang màn hình riêng biệt (nằm trong mục Settings, truy cập từ Sidebar) cho phép quản lý thông tin đóng vai của AI (Persona) và kho dữ liệu Tour du lịch, Ưu đãi dưới dạng danh sách mở rộng (Accordion).
 
-## 2. Tính Năng & Luồng Hoạt Động (User Flow)
-1. **Upload Tài Liệu**:
-   - Giao diện kéo thả tệp (Drag & Drop).
-   - Hỗ trợ định dạng: `.pdf`, `.docx`, `.txt`, `.csv`, `.xlsx`.
-   - Lưu trữ tệp gốc vào Storage (AWS S3, Google Cloud Storage, hoặc Local disk).
+## 2. Giao Diện & Thành Phần (UI Components)
 
-2. **AI Document Categorizer (Tự Động Tạo Cây Danh Mục)**:
-   - Hệ thống đọc tệp, gửi toàn bộ (hoặc từng phần nếu tệp lớn) qua LLM (Gemini Flash) với prompt yêu cầu bóc tách cấu trúc tài liệu.
-   - LLM trả về JSON Schema gồm:
-     - Tên danh mục (ví dụ: *Quy định chung*, *Hướng dẫn sử dụng*, *Bảng giá*).
-     - Gắn kết các đoạn văn bản (chunks) vào các danh mục tương ứng.
+### Thanh Điều Hướng Tổng Thể (Global Navigation Sidebar)
+- Thanh chiều rộng `80px` cố định bên trái, màu nền `#18181B`.
+- Icon `Knowledge Base` được Highlight với màu **Sapphire Accent (`#2563EB`)**.
 
-3. **Xử Lý Text & Chunking**:
-   - Sử dụng thuật toán cắt văn bản thông minh (Recursive Character Text Splitter).
-   - Đảm bảo mỗi chunk bảo toàn được ngữ nghĩa (không bị cắt lửng câu).
+### Khối 1: Cấu Hình Persona Roleplay (Top Form Card)
+- **Form Card**: Khung cấu hình đóng vai cho AI.
+- **Các trường dữ liệu**:
+  - `Agent Name`: Tên nhân viên hiển thị (vd: Nguyễn Văn A).
+  - `Job Title / Experience`: Chức danh và kinh nghiệm (vd: Chuyên viên tư vấn Tour Chuyên nghiệp, 5 năm kinh nghiệm).
+  - `Tone of Voice`: Giọng điệu tư vấn (vd: Lịch sự, nhiệt tình, xưng em gọi anh/chị).
+- **Nút bấm**: `Save Persona` (Sapphire Accent fill).
 
-4. **Embedding & Vector Storage**:
-   - Gọi API nhúng (Embedding Model) để chuyển đổi mỗi chunk thành một vector số.
-   - Lưu trữ vào bảng `knowledge_chunks` trong PostgreSQL (sử dụng kiểu dữ liệu `vector`).
+### Khối 2: Kho Dữ Liệu Tour & Khuyến Mãi (Accordion List)
+Danh sách các Tour du lịch và Ưu đãi được hiển thị dưới dạng **Hàng ngang Accordion**:
 
-## 3. Cấu Trúc Dữ Liệu Đề Xuất (Database)
-- Bảng `documents`: Lịch sử các tệp đã tải lên.
-- Bảng `categories`: Lưu cấu trúc Cây Danh Mục (Nested structure: `parent_id`, `name`).
-- Bảng `knowledge_chunks`:
-  - `id`: PK
-  - `document_id`: FK
-  - `category_id`: FK
-  - `content`: text
-  - `embedding`: vector
-  - `is_user_edited`: boolean (Mặc định `false`)
-  - `metadata`: JSONB (lưu trang PDF, vị trí dòng, v.v.)
+1. **Trạng Thái Thu Gọn (Collapsed Row)**:
+   - `Title`: Tên Tour / Chương trình ưu đãi (vd: Tour Đà Nẵng - Hội An 3N2Đ).
+   - `Price`: Mức giá hiển thị (vd: 5,990,000 VNĐ).
+   - `Start Date`: Ngày bắt đầu khởi hành/áp dụng.
+   - `Expiry Date`: Ngày hết hạn đăng ký.
+   - `Status Badge`: Nhãn `Active` (Màu Safe Emerald `#16A34A`).
+
+2. **Trạng Thái Mở Rộng (Expanded Row)**:
+   - `Content`: Chi tiết lịch trình, dịch vụ bao gồm.
+   - `Editable Inputs`: Các ô input để sửa nhanh `Price`, `Start Date`, `Expiry Date`.
+   - `Action Buttons`: Nút `Save Changes` (Sapphire Accent fill) và Nút `Delete` (Alert Crimson outline `#DC2626`).
+
+## 3. Quy Trình Dữ Liệu (Data Handling)
+- Khi ấn `Save Changes` trên một hàng Tour, hệ thống tự động cập nhật Database và tính toán lại Vector Embedding cho Tour đó.
+- Khi AI nhận câu hỏi từ khách hàng, AI sẽ tìm kiếm Tour phù hợp trong cơ sở dữ liệu này kết hợp với `Persona Settings` để sinh ra câu trả lời cá nhân hóa.

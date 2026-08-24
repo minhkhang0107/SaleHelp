@@ -1,21 +1,26 @@
 # 04 - Màn Hình Dashboard Quản Lý Chat & Takeover (Chat Dashboard)
 
 ## 1. Mục Đích
-Màn hình chuyên biệt dành cho tổng đài viên theo dõi các cuộc trò chuyện thời gian thực từ Zalo OA / Facebook Messenger và can thiệp (Human Takeover) khi cần thiết.
+Màn hình trung tâm (Cockpit) cho phép tổng đài viên theo dõi tất cả các cuộc trò chuyện thời gian thực từ đa kênh (Zalo, Messenger) và thực hiện can thiệp (Human Takeover) khi AI tư vấn chưa chính xác.
 
-## 2. Bố Cục 3 Cột (20% - 50% - 30%)
-Giao diện kết hợp với **Global Navigation Menu** ở sát bên trái.
+## 2. Giao Diện Bố Cục 3 Cột (20% - 50% - 30%)
 
-### Cột Trái (20%): Omnichannel Inbox
-- Danh sách hội thoại khách hàng gần đây.
-- Thẻ thông tin khách: Avatar, Tên khách hàng, Tag nền tảng (Zalo/Messenger), Nội dung tin nhắn mới nhất.
+### Thanh Điều Hướng Tổng Thể (Global Navigation Sidebar)
+- Thanh chiều rộng `80px` cố định bên trái, màu nền `#18181B`.
+- Icon `Chat` được Highlight với màu **Sapphire Accent (`#2563EB`)**.
 
-### Cột Giữa (50%): Active Chat Window
-- Khung hội thoại chính giữa Khách hàng và AI Bot.
-- Gắn điểm tin cậy (**Confidence Score**) bên cạnh các câu trả lời của AI (Xanh emerald khi >0.85, Đỏ crimson khi <0.70).
-- Khung nhập liệu chat ở phía dưới dành cho nhân viên khi chuyển chế độ.
+### Cột 1 (20% Width): Omnichannel Inbox
+- Danh sách cuộc hội thoại gần đây.
+- Thẻ thông tin khách: Avatar, Tên khách hàng, Tag nền tảng (Zalo/Messenger), Snippet tin nhắn cuối cùng.
 
-### Cột Phải (30%): Agent Control Panel & Context Summary
-- **Công tắc Human Takeover**: Công tắc lớn ở trên cùng để bật/tắt chế độ AI tự động trả lời.
-- **Tóm tắt thông tin khách hàng**: Tên, SĐT, Nguồn kênh.
-- **Trích dẫn tri thức đã dùng (Retrieved Context)**: Hiển thị các đoạn thông tin Tour/Ưu đãi mà AI đã dùng để trả lời tin nhắn hiện tại (được truy xuất tự động từ trang Knowledge Base).
+### Cột 2 (50% Width): Active Chat Window
+- Khung hiển thị luồng hội thoại giữa Khách hàng và AI Bot.
+- **Confidence Score Pill**: Gắn nhãn điểm tin cậy bên cạnh mỗi tin nhắn của AI.
+  - Điểm cao (> 0.85): Màu Safe Emerald (`#16A34A`).
+  - Điểm thấp (< 0.70): Màu Alert Crimson (`#DC2626`).
+- Khung nhập tin nhắn trực tiếp ở đáy màn hình dành cho nhân viên gõ câu trả lời.
+
+### Cột 3 (30% Width): Agent Control Panel & Context Summary
+- **Công Tắc Human Takeover**: Công tắc toggle lớn trên cùng. Khi bật sang `Human Agent`, hệ thống khóa tính năng AI Auto-reply cho phiên chat này.
+- **Tóm Tắt Khách Hàng**: Tên, Số điện thoại, Kênh liên hệ.
+- **Trích Dẫn Tri Thức Đã Dùng (Retrieved Context)**: Hiển thị các thông tin Tour / Ưu đãi mà RAG đã truy xuất từ trang Knowledge Base để AI tạo ra câu trả lời hiện tại.

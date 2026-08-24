@@ -1,28 +1,27 @@
-# 00 - Tổng Quan Hệ Thống (Overview)
+# 00 - Tổng Quan Dự Án (Social QA Auto-Responder - Tourism Edition)
 
-## 1. Tên Dự Án
-**Social QA Auto-Responder (Web AI Bot)**
+## 1. Giới Thiệu
+Dự án **Social QA Auto-Responder** là giải pháp phần mềm tự động hóa phản hồi khách hàng đa kênh (Zalo OA, Facebook Messenger, Telegram), được tùy chỉnh chuyên biệt cho **ngành Du lịch, Tour & Khuyến mãi**. Hệ thống kết hợp công nghệ **RAG (Retrieval-Augmented Generation)** và **Persona Roleplay** giúp AI tự động tư vấn lịch trình, giá bán, hạn chót ưu đãi theo đúng phong cách nói chuyện của từng nhân viên sale.
 
-## 2. Mục Tiêu (Objective)
-Xây dựng một nền tảng Web App (SaaS-like) cho phép cá nhân và doanh nghiệp:
-1. **Quản lý Tri Thức (Knowledge Base)**: Tải lên các tệp tài liệu (PDF, Word, Excel, TXT, CSV). AI sẽ tự động phân tích và cấu trúc lại thành một Cây Danh Mục Chỉ Mục (Category Index Tree).
-2. **Chỉnh Sửa Trực Tiếp (Direct Web Editor)**: Giao diện cho phép người dùng trực tiếp sửa đổi, thêm bớt nội dung, câu hỏi FAQ ngay trên nền web, đảm bảo AI trả lời theo đúng ý muốn.
-3. **Tự Động Phản Hồi Đa Kênh (Omnichannel Auto-Responder)**: Tích hợp Zalo OA, Facebook Messenger, Telegram để tự động trả lời khách hàng dựa trên Kho tri thức (RAG - Retrieval-Augmented Generation).
-4. **Kiểm Soát Chat (Human Takeover)**: Theo dõi lịch sử chat, đánh giá độ tin cậy của câu trả lời AI (Confidence Score), và cho phép nhân viên vào chat trực tiếp khi AI không chắc chắn.
+## 2. Các Phân Hệ Màn Hình Cốt Lõi (Core UI Modules)
 
-## 3. Kiến Trúc Tổng Thể (High-Level Architecture)
-Hệ thống được chia thành 4 phân hệ chính:
-1. **Web Dashboard & Editor**: Frontend quản lý.
-2. **AI Categorizer & Indexing Engine**: Phân tích tài liệu, bóc tách chunks và tạo danh mục, lưu trữ Vector DB (`pgvector`).
-3. **Webhook Gateway & Async Queue**: Nhận sự kiện từ Zalo/FB/Telegram, phản hồi 200 OK ngay lập tức, đẩy logic vào Redis Queue.
-4. **LLM RAG Engine**: Retrieval tìm kiếm ngữ cảnh, sinh câu trả lời bằng Gemini/GPT, kiểm tra Threshold chặn ảo giác (hallucination).
+Hệ thống được thiết kế theo phong cách **Cockpit Data-Dense** tối giản, chuyên nghiệp với thanh **Global Navigation Sidebar (80px)** cố định ở bên trái cho phép chuyển đổi tức thì giữa 3 phân hệ:
 
-## 4. Tech Stack Đề Xuất
-- **Frontend**: Next.js, TailwindCSS, React-Treeview, Tiptap (Rich Text Editor).
-- **Backend API & Webhook**: Node.js (NestJS / Express) hoặc Python (FastAPI).
-- **Database**: PostgreSQL (Relational data) + `pgvector` extension (Vector embeddings).
-- **Queue System**: Redis + BullMQ (hoặc Celery).
-- **AI Models**: 
-  - Tách & Phân loại: Gemini 1.5 Flash (Structured JSON Mode).
-  - Trả lời chat (LLM): Gemini 1.5 Flash / OpenAI GPT-4o-mini.
-  - Embedding: text-embedding-3-small (OpenAI) hoặc Gemini Embedding.
+1. **Màn Hình Chat Dashboard & Human Takeover** (`04-chat-dashboard.md`):
+   - Bố cục 3 cột (20% Inbox - 50% Khung Chat - 30% Control Panel).
+   - Gắn nhãn **Confidence Score** trên mỗi tin nhắn của AI.
+   - Công tắc **Human Takeover** nổi bật giúp nhân viên giành quyền chat bất cứ lúc nào.
+
+2. **Màn Hình Quản Lý Tri Thức & Persona (Settings Page)** (`01-knowledge-base-management.md`):
+   - Trang riêng biệt quản lý dữ liệu Tour / Ưu đãi theo mô hình **Accordion List (Hàng ngang thu gọn / mở rộng)**.
+   - Quản lý thông tin **Persona Roleplay** (Tên nhân viên, kinh nghiệm, giọng điệu) để AI giả lập phong cách tư vấn.
+
+3. **Màn Hình Tích Hợp Kênh (Settings Page)** (`03-channel-integration.md`):
+   - Danh sách các nền tảng chat (Zalo OA, Messenger, Telegram).
+   - Quản lý trạng thái kết nối với các nút `Authorize`, `Connected`, và `Disconnect`.
+
+## 3. Kiến Trúc Kỹ Thuật (Technical Architecture)
+- **Frontend**: Single Page Application (SPA), Vanilla CSS / Tailwind với hệ màu Clinical (Charcoal `#18181B`, Sapphire Accent `#2563EB`, Whisper Border `rgba(226,232,240,0.5)`).
+- **Backend API**: Node.js / Python FastAPI.
+- **Data & Vector Store**: PostgreSQL với extension `pgvector` để lưu trữ Embeddings của các Tour & Ưu đãi.
+- **Async Queue**: Redis / BullMQ xử lý Webhook bất đồng bộ (tránh timeout 2s từ Zalo/Meta).
