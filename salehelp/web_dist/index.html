@@ -2011,7 +2011,24 @@
         // 1. Call Real Google Gemini AI API
         let aiText = '';
         try {
-          const sysPrompt = `Bạn là ${personaState.name}, ${personaState.title}. Phong cách tư vấn: ${personaState.tone}.\nThông tin tour du lịch trong kho dữ liệu (RAG):\n- Tên: ${matchedTour.title}\n- Giá: ${matchedTour.price}\n- Chi tiết: ${matchedTour.content}\nHãy trả lời câu hỏi của khách hàng một cách thân thiện, chính xác giá tour và chi tiết dịch vụ.`;
+          const sysPrompt = `BẠN LÀ CHUYÊN VIÊN TƯ VẤN & CHỐT ĐƠN TOUR DU LỊCH CAO CẤP.
+TÊN NHÂN VIÊN: ${personaState.name} (${personaState.title}).
+TÊN KHÁCH HÀNG: "${conv.name}".
+
+🎯 NGUYÊN TẮC BẮT BUỘC:
+1. Vào thẳng vấn đề, TƯ VẤN BÁO GIÁ TOUR / VÉ MÁY BAY NGAY LẬP TỨC.
+2. TUYỆT ĐỐI CẤM TÂM SỰ LAN MAN, CẤM KHEN THỜI TIẾT (Không nói "mùa này đẹp lắm", "thời tiết dịu mát", "rất hợp lý để đi chơi").
+3. LUÔN HỎI THÔNG TIN ĐỂ CHỐT ĐƠN Ở CUỐI CÂU: Hỏi ngày khách đi được, số lượng người đi (người lớn + trẻ em), điểm khởi hành.
+
+📚 THÔNG TIN TOUR TRONG KHO DỮ LIỆU (RAG):
+- Tên tour: ${matchedTour.title}
+- Giá ưu đãi: ${matchedTour.price}
+- Chi tiết dịch vụ trọn gói: ${matchedTour.content}
+
+📋 CẤU TRÚC PHẢN HỒI (3 PHẦN):
+1. Chào ngắn gọn 1 câu.
+2. Báo giá chi tiết tour (Giá ${matchedTour.price}/người trọn gói gồm vé máy bay + khách sạn + ăn uống).
+3. Hỏi ngày khách đi & số lượng người: "Anh/chị dự kiến đi vào ngày nào và đoàn mình đi bao nhiêu người để em kiểm tra vé máy bay giờ đẹp và giữ giá ưu đãi tốt nhất cho mình ạ?"`;
           
           const geminiRes = await fetch('/api/gemini/generate', {
             method: 'POST',
@@ -2025,15 +2042,15 @@
           const geminiData = await geminiRes.json();
           if (geminiData.candidates && geminiData.candidates[0]?.content?.parts[0]?.text) {
             aiText = geminiData.candidates[0].content.parts[0].text;
-            logApiTraffic('GEMINI_AI_REAL_RESPONSE', 'Google Gemini 2.0 Flash API (Live)', {
+            logApiTraffic('GEMINI_AI_REAL_RESPONSE', 'Google Gemini 3.6 Flash (Live Sales AI)', {
               model: model,
               responsePreview: aiText.substring(0, 60) + '...'
             });
           } else {
-            aiText = `Dạ em chào anh/chị! Em là ${personaState.name} (${personaState.title}). Về tour "${matchedTour.title}", giá ưu đãi hiện tại là ${matchedTour.price}. Chi tiết: ${matchedTour.content}`;
+            aiText = `Dạ em chào anh/chị! Em xin gửi thông tin tour "${matchedTour.title}" giá ưu đãi chỉ ${matchedTour.price}/người (Trọn gói: ${matchedTour.content}). Anh/chị dự kiến đi ngày nào và đoàn mình đi mấy người để em giữ giá vé tốt nhất ạ?`;
           }
         } catch (err) {
-          aiText = `Dạ em chào anh/chị! Em là ${personaState.name} (${personaState.title}). Về tour "${matchedTour.title}", giá ưu đãi hiện tại là ${matchedTour.price}. Chi tiết: ${matchedTour.content}`;
+          aiText = `Dạ em chào anh/chị! Em xin gửi thông tin tour "${matchedTour.title}" giá ưu đãi chỉ ${matchedTour.price}/người (Trọn gói: ${matchedTour.content}). Anh/chị dự kiến đi ngày nào và đoàn mình đi mấy người để em giữ giá vé tốt nhất ạ?`;
         }
 
         thread.innerHTML += `
