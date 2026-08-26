@@ -78,12 +78,21 @@
     if (skillEl) skillEl.innerText = activeSkillConfig.name || '🎯 Chốt Đơn Tour';
   }
 
-  // Universal Safe API Fetcher (Uses Background Worker to bypass all CORS / Mixed Content / PNA restrictions)
+  // Check if Chrome extension context is still valid (not invalidated after extension reload)
+  function isExtensionContextValid() {
+    try {
+      return Boolean(typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.id);
+    } catch (e) {
+      return false;
+    }
+  }
+
+  // Universal Safe API Fetcher (Uses Background Worker when valid, smoothly falls back to Direct Fetch)
   async function safeApiFetch(endpoint, options = {}) {
     const fullUrl = endpoint.startsWith('http') ? endpoint : `${config.serverUrl}${endpoint}`;
 
-    // 1. Try Extension Background Service Worker
-    if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage) {
+    // 1. Try Extension Background Service Worker if extension context is valid
+    if (isExtensionContextValid() && typeof chrome.runtime.sendMessage === 'function') {
       try {
         const res = await new Promise((resolve, reject) => {
           chrome.runtime.sendMessage({
@@ -102,23 +111,30 @@
         if (res && res.ok) {
           return res.data;
         } else if (res && res.error) {
-          throw new Error(res.error);
+          console.warn('[SaleHelp] Background worker response error:', res.error);
         }
       } catch (err) {
-        console.warn('[SaleHelp] Background worker fetch fallback to direct:', err.message);
+        // If context invalidated or messaging failed, smoothly continue to direct fetch
+        if (!err.message.includes('context invalidated')) {
+          console.warn('[SaleHelp] Background worker fetch fallback to direct:', err.message);
+        }
       }
     }
 
-    // 2. Direct Fetch fallback
-    const directRes = await fetch(fullUrl, options);
-    if (!directRes.ok) {
-      throw new Error(`HTTP ${directRes.status}`);
+    // 2. Direct Fetch fallback (always available)
+    try {
+      const directRes = await fetch(fullUrl, options);
+      if (!directRes.ok) {
+        throw new Error(`HTTP ${directRes.status}`);
+      }
+      const contentType = directRes.headers.get('content-type') || '';
+      if (contentType.includes('application/json')) {
+        return await directRes.json();
+      }
+      return await directRes.text();
+    } catch (err) {
+      throw err;
     }
-    const contentType = directRes.headers.get('content-type') || '';
-    if (contentType.includes('application/json')) {
-      return await directRes.json();
-    }
-    return await directRes.text();
   }
 
   // 1. FETCH LIVE ACTIVE SKILL FROM LOCAL SERVER
@@ -128,12 +144,14 @@
       if (data && data.name) {
         activeSkillConfig = data;
         updateSkillUI();
-        if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
+        if (isExtensionContextValid() && chrome.storage && chrome.storage.local) {
           chrome.storage.local.set({ salehelp_active_skill: data });
         }
       }
     } catch (e) {
-      console.warn('[SaleHelp] Chưa lấy được skill từ server:', e.message);
+      if (!e.message.includes('context invalidated')) {
+        console.warn('[SaleHelp] Chưa lấy được skill từ server:', e.message);
+      }
     }
   }
 
@@ -143,12 +161,14 @@
       const data = await safeApiFetch('/api/persona');
       if (data && data.name) {
         livePersonaState = data;
-        if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
+        if (isExtensionContextValid() && chrome.storage && chrome.storage.local) {
           chrome.storage.local.set({ salehelp_persona: data });
         }
       }
     } catch (e) {
-      console.warn('[SaleHelp] Chưa lấy được persona từ server:', e.message);
+      if (!e.message.includes('context invalidated')) {
+        console.warn('[SaleHelp] Chưa lấy được persona từ server:', e.message);
+      }
     }
   }
 
@@ -158,12 +178,14 @@
       const data = await safeApiFetch('/api/tours');
       if (Array.isArray(data) && data.length > 0) {
         liveToursState = data;
-        if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
+        if (isExtensionContextValid() && chrome.storage && chrome.storage.local) {
           chrome.storage.local.set({ salehelp_tours: data });
         }
       }
     } catch (e) {
-      console.warn('[SaleHelp] Chưa lấy được tour knowledge từ server:', e.message);
+      if (!e.message.includes('context invalidated')) {
+        console.warn('[SaleHelp] Chưa lấy được tour knowledge từ server:', e.message);
+      }
     }
   }
 
