@@ -1435,6 +1435,47 @@
       if (!container) return;
       container.innerHTML = '';
 
+      // 0. Render Chrome Extension AI Co-Pilot Banner for Personal Zalo
+      const extensionBanner = document.createElement('div');
+      extensionBanner.className = 'card';
+      extensionBanner.style.border = '1.5px solid #0284C7';
+      extensionBanner.style.background = 'linear-gradient(135deg, rgba(2, 132, 199, 0.05), rgba(37, 99, 235, 0.05))';
+      extensionBanner.style.marginBottom = '16px';
+      extensionBanner.innerHTML = `
+        <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+          <div style="display:flex; gap:14px; align-items:flex-start;">
+            <div style="width:44px; height:44px; border-radius:10px; background:#0284C7; color:white; display:flex; align-items:center; justify-content:center; font-size:24px; flex-shrink:0;">
+              🤖
+            </div>
+            <div>
+              <div style="font-size:15px; font-weight:700; color:#0284C7; display:flex; align-items:center; gap:8px;">
+                SaleHelp Chrome Extension (AI Tự Động Trả Lời Zalo Cá Nhân)
+                <span style="font-size:10px; padding:2px 8px; border-radius:12px; background:#DCFCE7; color:#166534; font-weight:700;">Manifest V3 Sẵn Sàng</span>
+              </div>
+              <div style="font-size:12px; color:var(--charcoal-deep); margin:4px 0 8px 0; line-height:1.5;">
+                Extension nhúng trực tiếp vào <b>chat.zalo.me</b> để tự động đọc tin nhắn của khách và để Google Gemini AI trả lời tự động 24/7 (An toàn 100%, không lo khóa tài khoản).
+              </div>
+              <div style="background:var(--pure-surface); border:1px solid var(--whisper-border); border-radius:8px; padding:10px; font-size:11.5px; line-height:1.6;">
+                <b>📌 Hướng dẫn 3 bước cài đặt vào Chrome:</b><br>
+                1️⃣ Mở tab mới trên Chrome/Cốc Cốc, gõ: <code style="background:rgba(2,132,199,0.1); padding:2px 6px; border-radius:4px; font-family:'JetBrains Mono';">chrome://extensions</code><br>
+                2️⃣ Bật công tắc <b>"Chế độ dành cho nhà phát triển" (Developer mode)</b> ở góc trên bên phải.<br>
+                3️⃣ Bấm <b>"Tải tiện ích đã giải nén" (Load unpacked)</b> ➔ Chọn thư mục <code style="background:rgba(2,132,199,0.1); padding:2px 6px; border-radius:4px; font-family:'JetBrains Mono';">salehelp/extension</code>.<br>
+                4️⃣ Mở trang <b><a href="https://chat.zalo.me" target="_blank" style="color:#0284C7; font-weight:700;">chat.zalo.me</a></b> ➔ Trợ lý AI sẽ tự động kích hoạt góc phải màn hình!
+              </div>
+            </div>
+          </div>
+          <div style="display:flex; flex-direction:column; gap:6px; flex-shrink:0; margin-left:14px;">
+            <button style="padding:8px 14px; background:#0284C7; color:white; border:none; border-radius:8px; font-weight:700; font-size:12px; cursor:pointer; display:flex; align-items:center; gap:6px;" onclick="copyExtensionFolder()">
+              📋 Copy Đường Dẫn Thư Mục
+            </button>
+            <button style="padding:8px 14px; background:var(--canvas-white); border:1px solid #CBD5E1; color:#334155; border-radius:8px; font-weight:600; font-size:12px; cursor:pointer; display:flex; align-items:center; gap:6px;" onclick="window.open('https://chat.zalo.me', '_blank')">
+              💬 Mở chat.zalo.me
+            </button>
+          </div>
+        </div>
+      `;
+      container.appendChild(extensionBanner);
+
       // 1. Render Zalo Personal Account (Top Priority)
       const personalItem = document.createElement('div');
       personalItem.className = 'card';
@@ -1546,6 +1587,12 @@
         `;
         container.appendChild(item);
       });
+    }
+
+    function copyExtensionFolder() {
+      const extPath = '/home/david/Downloads/scripts/AI_tools/tools/sale-help/salehelp/extension';
+      navigator.clipboard.writeText(extPath);
+      alert(`📋 ĐÃ COPY ĐƯỜNG DẪN THƯ MỤC EXTENSION:\n\n${extPath}\n\n👉 Các bước tiếp theo:\n1. Mở tab mới: chrome://extensions\n2. Bật "Developer mode" (góc trên bên phải)\n3. Bấm "Load unpacked" và chọn thư mục này để cài đặt!`);
     }
 
     // 1-CLICK INSTANT AUTHORIZE HANDLERS

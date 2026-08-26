@@ -1,0 +1,242 @@
+/* ==============================================================================
+   SALEHELP ZALO AI COPILOT FLOATING WIDGET STYLES
+   ============================================================================== */
+
+#salehelp-ai-widget {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  z-index: 999999;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.15), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+  border-radius: 14px;
+  background: #FFFFFF;
+  border: 1px solid #E2E8F0;
+  width: 340px;
+  overflow: hidden;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  color: #0F172A;
+}
+
+#salehelp-ai-widget.minimized {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  padding: 0;
+  cursor: pointer;
+  background: #0284C7;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 12px rgba(2, 132, 199, 0.4);
+}
+
+#salehelp-ai-widget.minimized .widget-body,
+#salehelp-ai-widget.minimized .widget-header {
+  display: none;
+}
+
+#salehelp-ai-widget.minimized .minimized-icon {
+  display: block;
+  color: white;
+  font-size: 24px;
+}
+
+.minimized-icon {
+  display: none;
+}
+
+.widget-header {
+  background: linear-gradient(135deg, #0284C7, #2563EB);
+  color: white;
+  padding: 12px 14px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: grab;
+}
+
+.widget-title {
+  font-size: 13px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.widget-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.widget-btn-icon {
+  background: rgba(255, 255, 255, 0.2);
+  border: none;
+  color: white;
+  border-radius: 4px;
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 11px;
+}
+
+.widget-btn-icon:hover {
+  background: rgba(255, 255, 255, 0.35);
+}
+
+.widget-body {
+  padding: 12px 14px;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.widget-toggle-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #F1F5F9;
+  margin-bottom: 10px;
+}
+
+.widget-toggle-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #334155;
+}
+
+.widget-switch {
+  position: relative;
+  display: inline-block;
+  width: 36px;
+  height: 20px;
+}
+
+.widget-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.widget-slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: #CBD5E1;
+  transition: .3s;
+  border-radius: 20px;
+}
+
+.widget-slider:before {
+  position: absolute;
+  content: "";
+  height: 14px;
+  width: 14px;
+  left: 3px;
+  bottom: 3px;
+  background-color: white;
+  transition: .3s;
+  border-radius: 50%;
+}
+
+input:checked + .widget-slider {
+  background-color: #10B981;
+}
+
+input:checked + .widget-slider:before {
+  transform: translateX(16px);
+}
+
+.suggestion-box {
+  background: #F8FAFC;
+  border: 1px solid #E2E8F0;
+  border-radius: 8px;
+  padding: 10px;
+  margin-bottom: 10px;
+  font-size: 12px;
+}
+
+.suggestion-header {
+  display: flex;
+  justify-content: space-between;
+  font-weight: 700;
+  font-size: 11px;
+  color: #0284C7;
+  margin-bottom: 4px;
+}
+
+.suggestion-text {
+  color: #1E293B;
+  line-height: 1.4;
+  margin-bottom: 8px;
+  max-height: 120px;
+  overflow-y: auto;
+}
+
+.suggestion-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.btn-insert-send {
+  flex: 1;
+  background: #0284C7;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+
+.btn-insert-send:hover {
+  background: #0369A1;
+}
+
+.btn-insert-only {
+  background: #E2E8F0;
+  color: #334155;
+  border: none;
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.btn-insert-only:hover {
+  background: #CBD5E1;
+}
+
+.status-indicator {
+  font-size: 11px;
+  color: #64748B;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #10B981;
+  display: inline-block;
+}
+
+.status-dot.offline {
+  background: #EF4444;
+}

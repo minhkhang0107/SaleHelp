@@ -1,0 +1,36 @@
+{
+  "manifest_version": 3,
+  "name": "SaleHelp - AI Auto Responder cho Zalo Cá Nhân",
+  "version": "1.0.0",
+  "description": "Tự động tư vấn & trả lời tin nhắn Zalo cá nhân trên chat.zalo.me bằng Google Gemini AI và kho dữ liệu Tour du lịch SaleHelp.",
+  "permissions": [
+    "storage"
+  ],
+  "host_permissions": [
+    "https://chat.zalo.me/*",
+    "http://localhost:8080/*",
+    "http://127.0.0.1:8080/*"
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "SaleHelp Zalo AI Assistant",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://chat.zalo.me/*"],
+      "js": ["content.js"],
+      "css": ["styles.css"],
+      "run_at": "document_end"
+    }
+  ]
+}
