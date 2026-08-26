@@ -1,10 +1,10 @@
 // ==============================================================================
-// SALEHELP ZALO AI COPILOT (V8 LIVE KNOWLEDGE BASE & DYNAMIC SKILL ENGINE)
+// SALEHELP ZALO AI COPILOT (V9 BACKGROUND PROXY & FAIL-SAFE FETCH)
 // Injected into https://chat.zalo.me/*
 // ==============================================================================
 
 (function() {
-  console.log('🚀 [SaleHelp] AI Co-Pilot Extension v8 (Live Knowledge Base & Dynamic Skill Sync) Loaded!');
+  console.log('🚀 [SaleHelp] AI Co-Pilot Extension v9 (Background Proxy & Live Knowledge Base) Loaded!');
 
   let config = {
     serverUrl: 'http://localhost:8080',
@@ -68,41 +68,78 @@
     if (skillEl) skillEl.innerText = activeSkillConfig.name || '🎯 Chốt Đơn Tour';
   }
 
+  // Universal Safe API Fetcher (Uses Background Worker to bypass all CORS / Mixed Content / PNA restrictions)
+  async function safeApiFetch(endpoint, options = {}) {
+    const fullUrl = endpoint.startsWith('http') ? endpoint : `${config.serverUrl}${endpoint}`;
+
+    // 1. Try Extension Background Service Worker (100% immune to CORS & Mixed Content)
+    if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage) {
+      try {
+        const res = await new Promise((resolve, reject) => {
+          chrome.runtime.sendMessage({
+            action: 'api_request',
+            url: fullUrl,
+            options: options
+          }, response => {
+            if (chrome.runtime.lastError) {
+              reject(new Error(chrome.runtime.lastError.message));
+            } else {
+              resolve(response);
+            }
+          });
+        });
+
+        if (res && res.ok) {
+          return res.data;
+        } else if (res && res.error) {
+          throw new Error(res.error);
+        }
+      } catch (err) {
+        console.warn('[SaleHelp] Background worker fetch fallback to direct:', err.message);
+      }
+    }
+
+    // 2. Direct Fetch fallback
+    const directRes = await fetch(fullUrl, options);
+    if (!directRes.ok) {
+      throw new Error(`HTTP ${directRes.status}`);
+    }
+    const contentType = directRes.headers.get('content-type') || '';
+    if (contentType.includes('application/json')) {
+      return await directRes.json();
+    }
+    return await directRes.text();
+  }
+
   // 1. FETCH LIVE ACTIVE SKILL FROM LOCAL SERVER
   async function fetchLiveActiveSkill() {
     try {
-      const res = await fetch(`${config.serverUrl}/api/skills/active`);
-      if (res.ok) {
-        const data = await res.json();
-        if (data && data.name) {
-          activeSkillConfig = data;
-          updateSkillUI();
-          if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
-            chrome.storage.local.set({ salehelp_active_skill: data });
-          }
+      const data = await safeApiFetch('/api/skills/active');
+      if (data && data.name) {
+        activeSkillConfig = data;
+        updateSkillUI();
+        if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
+          chrome.storage.local.set({ salehelp_active_skill: data });
         }
       }
     } catch (e) {
-      console.warn('[SaleHelp] Chưa lấy được skill từ server:', e);
+      console.warn('[SaleHelp] Chưa lấy được skill từ server:', e.message);
     }
   }
 
   // 2. FETCH LIVE TOURS KNOWLEDGE BASE FROM LOCAL SERVER (:8080/api/tours)
   async function fetchLiveToursKnowledge() {
     try {
-      const res = await fetch(`${config.serverUrl}/api/tours`);
-      if (res.ok) {
-        const data = await res.json();
-        if (Array.isArray(data) && data.length > 0) {
-          liveToursState = data;
-          console.log(`[SaleHelp] 📚 Đã tải ${liveToursState.length} tours từ Knowledge Base Server.`);
-          if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
-            chrome.storage.local.set({ salehelp_tours: data });
-          }
+      const data = await safeApiFetch('/api/tours');
+      if (Array.isArray(data) && data.length > 0) {
+        liveToursState = data;
+        console.log(`[SaleHelp] 📚 Đã tải ${liveToursState.length} tours từ Knowledge Base.`);
+        if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
+          chrome.storage.local.set({ salehelp_tours: data });
         }
       }
     } catch (e) {
-      console.warn('[SaleHelp] Chưa lấy được tour knowledge từ server:', e);
+      console.warn('[SaleHelp] Chưa lấy được tour knowledge từ server:', e.message);
     }
   }
 
@@ -126,7 +163,7 @@
       <div class="minimized-icon" id="salehelp-minimized-icon">🤖</div>
       <div class="widget-header" id="salehelp-widget-header">
         <div class="widget-title">
-          <span>🤖 SaleHelp AI v8</span>
+          <span>🤖 SaleHelp AI v9</span>
         </div>
         <div class="widget-actions">
           <button class="widget-btn-icon" id="salehelp-btn-minimize" title="Thu nhỏ">_</button>
@@ -307,7 +344,7 @@
     const dot = document.getElementById('salehelp-status-dot');
     const text = document.getElementById('salehelp-status-text');
     try {
-      const res = await fetch(`${config.serverUrl}/api/gemini/generate`, {
+      await safeApiFetch('/api/gemini/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ prompt: 'ping', model: 'gemini-3.6-flash' })
@@ -543,7 +580,7 @@ TÊN KHÁCH HÀNG: {CUSTOMER_NAME}.
     sysPrompt += `\n\n📚 BẢNG GIÁ TOUR & DỊCH VỤ CẬP NHẬT TRỰC TIẾP TỪ KNOWLEDGE BASE DASHBOARD:\n${liveKnowledgeBlock}`;
 
     try {
-      const res = await fetch(`${config.serverUrl}/api/gemini/generate`, {
+      const data = await safeApiFetch('/api/gemini/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -554,9 +591,8 @@ TÊN KHÁCH HÀNG: {CUSTOMER_NAME}.
         })
       });
 
-      const data = await res.json();
       let aiReply = '';
-      if (data.candidates && data.candidates[0]?.content?.parts[0]?.text) {
+      if (data && data.candidates && data.candidates[0]?.content?.parts[0]?.text) {
         aiReply = data.candidates[0].content.parts[0].text;
       } else {
         aiReply = `Dạ em chào anh/chị! Em xin gửi thông tin giá tour ưu đãi tốt nhất trọn gói vé máy bay và khách sạn. Anh/chị dự kiến đi vào ngày nào và đoàn mình đi bao nhiêu người để em giữ giá vé tốt nhất ạ?`;
