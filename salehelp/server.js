@@ -210,7 +210,7 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // 4. Real Gemini AI Chat Generation
+  // 4. Real Gemini AI Chat Generation (With Multi-Turn History Memory)
   if (pathname === '/api/gemini/generate' && req.method === 'POST') {
     let body = '';
     req.on('data', chunk => body += chunk);
@@ -228,13 +228,39 @@ const server = http.createServer(async (req, res) => {
           return;
         }
 
-        const geminiBody = {
-          contents: [
-            {
-              parts: [{ text: (systemInstruction ? `[SYSTEM CONTEXT & KNOWLEDGE]\n${systemInstruction}\n\n[USER QUERY]\n` : '') + prompt }]
-            }
-          ]
-        };
+        let geminiBody = {};
+        if (payload.contents && Array.isArray(payload.contents)) {
+          geminiBody = {
+            systemInstruction: systemInstruction ? { parts: [{ text: systemInstruction }] } : undefined,
+            contents: payload.contents
+          };
+        } else if (payload.history && Array.isArray(payload.history)) {
+          const contents = [];
+          payload.history.forEach(h => {
+            contents.push({
+              role: h.role === 'user' ? 'user' : 'model',
+              parts: [{ text: h.text }]
+            });
+          });
+          if (prompt) {
+            contents.push({
+              role: 'user',
+              parts: [{ text: prompt }]
+            });
+          }
+          geminiBody = {
+            systemInstruction: systemInstruction ? { parts: [{ text: systemInstruction }] } : undefined,
+            contents: contents
+          };
+        } else {
+          geminiBody = {
+            contents: [
+              {
+                parts: [{ text: (systemInstruction ? `[SYSTEM CONTEXT & KNOWLEDGE]\n${systemInstruction}\n\n[USER QUERY]\n` : '') + prompt }]
+              }
+            ]
+          };
+        }
 
         const postData = JSON.stringify(geminiBody);
         const options = {
