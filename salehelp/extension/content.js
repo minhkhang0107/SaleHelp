@@ -1,10 +1,10 @@
 // ==============================================================================
-// SALEHELP ZALO PERSONAL AI COPILOT & AUTO-RESPONDER CONTENT SCRIPT
+// SALEHELP ZALO PERSONAL AI COPILOT & AUTO-RESPONDER CONTENT SCRIPT (V2 ULTRA)
 // Injected into https://chat.zalo.me/*
 // ==============================================================================
 
 (function() {
-  console.log('🚀 [SaleHelp] AI Co-Pilot Extension loaded into Zalo Web!');
+  console.log('🚀 [SaleHelp] AI Co-Pilot Extension v2 loaded into Zalo Web!');
 
   let config = {
     serverUrl: 'http://localhost:8080',
@@ -15,13 +15,18 @@
   };
 
   // Load saved settings from Chrome Storage
-  if (chrome && chrome.storage && chrome.storage.local) {
+  if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
     chrome.storage.local.get(['salehelp_config'], (res) => {
       if (res.salehelp_config) {
         config = { ...config, ...res.salehelp_config };
-        updateWidgetUI();
+        updateWidgetToggleUI();
       }
     });
+  }
+
+  function updateWidgetToggleUI() {
+    const toggle = document.getElementById('salehelp-autoreply-toggle');
+    if (toggle) toggle.checked = config.autoReply;
   }
 
   // 1. INJECT FLOATING WIDGET INTO ZALO WEB
@@ -47,6 +52,10 @@
             <input type="checkbox" id="salehelp-autoreply-toggle" ${config.autoReply ? 'checked' : ''} onchange="onAutoReplyToggle(this.checked)">
             <span class="widget-slider"></span>
           </label>
+        </div>
+
+        <div style="margin-bottom: 10px;">
+          <button class="btn-insert-send" style="width:100%; padding:8px;" onclick="triggerManualReply()">⚡ Trả Lời Tin Nhắn Mới Nhất (AI Reply)</button>
         </div>
 
         <div class="suggestion-box" id="salehelp-suggestion-box" style="display:none;">
@@ -83,17 +92,16 @@
       });
       if (dot && text) {
         dot.className = 'status-dot';
-        text.innerText = 'Server kết nối tốt (Gemini AI Sẵn Sàng)';
+        text.innerText = 'Server: Sẵn sàng (Gemini AI Active)';
       }
     } catch (e) {
       if (dot && text) {
         dot.className = 'status-dot offline';
-        text.innerText = 'Chưa bật SaleHelp Server (:8080)';
+        text.innerText = 'Chưa bật Server (:8080)';
       }
     }
   }
 
-  // Toggle widget minimize
   window.toggleWidgetMinimize = function(minimize) {
     const widget = document.getElementById('salehelp-ai-widget');
     if (widget) {
@@ -104,7 +112,7 @@
 
   window.onAutoReplyToggle = function(checked) {
     config.autoReply = checked;
-    if (chrome && chrome.storage && chrome.storage.local) {
+    if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
       chrome.storage.local.set({ salehelp_config: config });
     }
   };
@@ -123,67 +131,111 @@
     document.getElementById('salehelp-suggestion-box').style.display = 'none';
   };
 
-  // 2. INSERT TEXT INTO ZALO WEB CHAT INPUT BOX
+  // 2. INSERT TEXT INTO ZALO WEB CHAT INPUT BOX (MULTI-STRATEGY)
   function insertTextIntoZaloInput(text, autoSend = false) {
     const inputEl = document.querySelector('div[contenteditable="true"]') || 
                     document.querySelector('#input_content') || 
                     document.querySelector('.rich-input') ||
                     document.querySelector('textarea');
 
-    if (inputEl) {
-      inputEl.focus();
-      // Use document.execCommand for rich text editable div
+    if (!inputEl) {
+      console.warn('[SaleHelp] Không tìm thấy ô nhập tin nhắn Zalo Web!');
+      return;
+    }
+
+    inputEl.focus();
+
+    // Strategy A: execCommand insertText
+    try {
       document.execCommand('selectAll', false, null);
       document.execCommand('insertText', false, text);
+    } catch (e) {}
 
-      // Trigger input event
-      inputEl.dispatchEvent(new Event('input', { bubbles: true }));
+    // Strategy B: Direct innerText & input event
+    if (!inputEl.innerText || !inputEl.innerText.includes(text)) {
+      inputEl.innerText = text;
+    }
 
-      if (autoSend) {
+    inputEl.dispatchEvent(new Event('input', { bubbles: true }));
+    inputEl.dispatchEvent(new Event('change', { bubbles: true }));
+
+    if (autoSend) {
+      setTimeout(() => {
+        // Trigger Enter key events
+        const enterDown = new KeyboardEvent('keydown', { bubbles: true, cancelable: true, keyCode: 13, which: 13, key: 'Enter' });
+        const enterPress = new KeyboardEvent('keypress', { bubbles: true, cancelable: true, keyCode: 13, which: 13, key: 'Enter' });
+        const enterUp = new KeyboardEvent('keyup', { bubbles: true, cancelable: true, keyCode: 13, which: 13, key: 'Enter' });
+        
+        inputEl.dispatchEvent(enterDown);
+        inputEl.dispatchEvent(enterPress);
+        inputEl.dispatchEvent(enterUp);
+
+        // Click Send button
         setTimeout(() => {
-          // Trigger Enter keydown
-          const enterDown = new KeyboardEvent('keydown', {
-            bubbles: true,
-            cancelable: true,
-            keyCode: 13,
-            which: 13,
-            key: 'Enter'
-          });
-          inputEl.dispatchEvent(enterDown);
-
-          // Fallback: Click send button if Enter didn't submit
           const sendBtn = document.querySelector('.btn-send') || 
                           document.querySelector('div[data-translate-title="STR_SEND"]') ||
-                          document.querySelector('.send-btn');
+                          document.querySelector('.send-btn') ||
+                          document.querySelector('i.fa-paper-plane')?.parentElement;
           if (sendBtn) sendBtn.click();
-        }, 300);
-      }
+        }, 150);
+      }, 300);
     }
   }
 
-  // 3. LISTEN TO NEW INCOMING MESSAGES VIA MUTATION OBSERVER
+  // 3. LISTEN & EXTRACT LATEST INCOMING MESSAGE ON ZALO WEB
   let isProcessing = false;
 
-  async function handleNewIncomingMessage(text, sender) {
-    if (isProcessing || text === config.lastProcessedMsg) return;
-    if (!text || text.length < 2) return;
+  function extractLatestIncomingMessage() {
+    // Find all message containers
+    const messageBlocks = document.querySelectorAll(
+      '.chat-item, .msg-item, .message-view, .chat-message, .msg-view, div[data-id], .rel, .msg-info'
+    );
+
+    if (!messageBlocks || messageBlocks.length === 0) return null;
+
+    // Scan from bottom up to find the latest incoming message
+    for (let i = messageBlocks.length - 1; i >= 0; i--) {
+      const el = messageBlocks[i];
+
+      // Check if outgoing message (me)
+      const isMe = el.classList.contains('me') || 
+                   el.classList.contains('msg-me') || 
+                   el.classList.contains('me-view') ||
+                   el.closest('.me') !== null ||
+                   el.querySelector('.me') !== null ||
+                   el.style.justifyContent === 'flex-end' ||
+                   el.getAttribute('data-is-me') === 'true';
+
+      if (!isMe) {
+        // Extract text content
+        const textNode = el.querySelector('.content, .text, .msg-text, .bubble-text, span, div.text') || el;
+        const text = textNode ? textNode.innerText.trim() : '';
+        if (text && text.length > 1 && !text.startsWith('🤖 SaleHelp')) {
+          return text;
+        }
+      }
+    }
+    return null;
+  }
+
+  async function processCustomerMessage(text) {
+    if (isProcessing) return;
+    if (!text || text === config.lastProcessedMsg) return;
 
     config.lastProcessedMsg = text;
     isProcessing = true;
 
-    console.log(`[SaleHelp] 📩 Tin nhắn mới từ khách (${sender}): "${text}"`);
+    console.log(`[SaleHelp] 📩 Đang xử lý tin nhắn khách: "${text}"`);
 
-    // Show suggestion box in UI
     const sugBox = document.getElementById('salehelp-suggestion-box');
     const sugText = document.getElementById('salehelp-suggestion-text');
     if (sugBox && sugText) {
       sugBox.style.display = 'block';
-      sugText.innerText = '🤖 AI đang suy nghĩ câu trả lời...';
+      sugText.innerText = '🤖 Gemini AI đang phân tích và tra cứu kho Tour...';
     }
 
     try {
-      // Call SaleHelp Gemini AI API
-      const sysPrompt = `Bạn là trợ lý AI tư vấn Tour Du Lịch chuyên nghiệp, lịch sự, xưng em gọi anh/chị. Hãy trả lời ngắn gọn, nhiệt tình, tư vấn chi tiết và báo giá rõ ràng.`;
+      const sysPrompt = `Bạn là chuyên viên tư vấn Tour Du Lịch nhiệt tình, lịch sự, xưng em gọi anh/chị. Hãy trả lời câu hỏi của khách ngắn gọn, nêu rõ giá tour và tư vấn chi tiết lịch trình.`;
       
       const res = await fetch(`${config.serverUrl}/api/gemini/generate`, {
         method: 'POST',
@@ -200,13 +252,12 @@
       if (data.candidates && data.candidates[0]?.content?.parts[0]?.text) {
         aiReply = data.candidates[0].content.parts[0].text;
       } else {
-        aiReply = `Dạ em chào anh/chị! Em đã nhận được tin nhắn về "${text}". Em xin gửi thông tin chi tiết các tour ưu đãi hiện có bên em ạ!`;
+        aiReply = `Dạ em chào anh/chị! Em đã nhận được câu hỏi về "${text}". Em xin gửi thông tin lịch trình tour và ưu đãi tốt nhất cho anh/chị tham khảo ạ!`;
       }
 
       currentSuggestion = aiReply;
       if (sugText) sugText.innerText = aiReply;
 
-      // Auto Reply if enabled
       if (config.autoReply) {
         console.log(`[SaleHelp] ⚡ Tự động gửi sau ${config.delaySeconds}s: ${aiReply.substring(0, 40)}...`);
         setTimeout(() => {
@@ -216,45 +267,47 @@
       }
     } catch (err) {
       console.error('[SaleHelp] Lỗi gọi Gemini AI:', err);
-      if (sugText) sugText.innerText = '❌ Không thể kết nối tới Server AI.';
+      if (sugText) sugText.innerText = '❌ Không thể kết nối tới Server AI (:8080).';
     } finally {
       setTimeout(() => { isProcessing = false; }, 3000);
     }
   }
 
-  // 4. OBSERVE CHAT CONTAINER ON CHAT.ZALO.ME
-  function setupMessageObserver() {
-    const observer = new MutationObserver((mutations) => {
-      // Find latest message items
-      const msgItems = document.querySelectorAll('.chat-item, .msg-item, .message-item, div[data-id]');
-      if (msgItems && msgItems.length > 0) {
-        const lastMsgEl = msgItems[msgItems.length - 1];
+  window.triggerManualReply = function() {
+    const text = extractLatestIncomingMessage();
+    if (text) {
+      config.lastProcessedMsg = ''; // Reset to force re-evaluation
+      processCustomerMessage(text);
+    } else {
+      alert('Không tìm thấy tin nhắn mới trong khung chat hiện tại. Vui lòng mở cuộc trò chuyện với khách hàng!');
+    }
+  };
 
-        // Check if message is from the other person (not me / me-bubble)
-        const isMyMessage = lastMsgEl.classList.contains('me') || 
-                            lastMsgEl.classList.contains('msg-me') ||
-                            lastMsgEl.querySelector('.me') !== null;
-
-        if (!isMyMessage) {
-          const textEl = lastMsgEl.querySelector('.content, .text, .msg-text, .bubble-text') || lastMsgEl;
-          const text = textEl ? textEl.innerText.trim() : '';
-          if (text) {
-            handleNewIncomingMessage(text, 'Khách hàng');
-          }
-        }
+  // 4. OBSERVE AND POLL CHAT CONTAINER ON CHAT.ZALO.ME
+  function setupMessageMonitoring() {
+    // A. Mutation Observer
+    const observer = new MutationObserver(() => {
+      const text = extractLatestIncomingMessage();
+      if (text && text !== config.lastProcessedMsg) {
+        processCustomerMessage(text);
       }
     });
 
-    observer.observe(document.body, {
-      childList: true,
-      subtree: true
-    });
+    observer.observe(document.body, { childList: true, subtree: true });
+
+    // B. Safe Polling Loop (Every 2 seconds) as bulletproof fallback
+    setInterval(() => {
+      const text = extractLatestIncomingMessage();
+      if (text && text !== config.lastProcessedMsg && !isProcessing) {
+        processCustomerMessage(text);
+      }
+    }, 2000);
   }
 
   // Initialize
   setTimeout(() => {
     injectFloatingWidget();
-    setupMessageObserver();
-  }, 2000);
+    setupMessageMonitoring();
+  }, 1500);
 
 })();
