@@ -291,7 +291,7 @@
 
   <!-- ZALO OA AUTHORIZATION MODAL (ZALO OPENAPI V4 PKCE SPEC) -->
   <div class="modal-backdrop" id="modal-zalo">
-    <div class="modal-box" style="width:620px; max-height:90vh; overflow-y:auto;">
+    <div class="modal-box" style="width:640px; max-height:90vh; overflow-y:auto;">
       <div class="modal-title" style="display:flex; justify-content:space-between; align-items:center;">
         <div style="display:flex; align-items:center; gap:8px;">
           <span class="material-symbols-outlined" style="color:#2563EB; font-size:24px;">chat_bubble</span>
@@ -306,38 +306,55 @@
         1️⃣ <b>Bước 1:</b> Nhấn nút <b>"🚀 1. Mở Trang Cấp Quyền Zalo"</b> để đăng nhập và chọn Zalo OA cấp quyền.<br>
         2️⃣ <b>Bước 2:</b> Sau khi Zalo chuyển hướng về, copy mã <code>code</code> trên thanh URL dán vào ô <b>"Mã Authorization Code"</b> bên dưới rồi bấm <b>"🔄 2. Đổi Code Lấy Token"</b>.
       </div>
+
+      <!-- Notice for -14003 Invalid redirect uri -->
+      <div style="background:#FEF2F2; border:1px solid #FECACA; border-radius:8px; padding:12px; margin-bottom:14px; font-size:12px; color:#991B1B; line-height:1.5;">
+        <div style="display:flex; align-items:center; gap:6px; font-weight:700; margin-bottom:4px;">
+          <span class="material-symbols-outlined" style="font-size:18px; color:var(--alert-crimson);">error</span>
+          Cách khắc phục lỗi "-14003: Invalid redirect uri" của Zalo:
+        </div>
+        Zalo yêu cầu URL gửi lên phải khớp 100% với <b>Callback URL</b> đã khai báo trong App.<br>
+        👉 Hãy truy cập <a href="https://developers.zalo.me" target="_blank" style="color:#2563EB; font-weight:700; text-decoration:underline;">developers.zalo.me</a> -> Chọn App của bạn -> <b>Cài đặt / Đăng nhập</b> -> Thêm chính xác <b>Callback URL</b> bên dưới:
+      </div>
       
       <div class="form-grid" style="grid-template-columns: 1fr 1fr; margin-bottom:12px;">
         <div class="form-group">
-          <label>Zalo App ID <span style="color:var(--alert-crimson);">*</span></label>
-          <input type="text" id="zalo-appid-input" placeholder="VD: 38291049182049120" value="38291049182049120">
+          <label>Zalo App ID <span style="color:var(--alert-crimson);">*</span> (Tự động lưu F5)</label>
+          <input type="text" id="zalo-appid-input" placeholder="VD: 2473857060476207268" value="2473857060476207268" oninput="saveZaloDraftConfig()">
         </div>
         <div class="form-group">
-          <label>Zalo Secret Key <span style="color:var(--alert-crimson);">*</span></label>
-          <input type="password" id="zalo-secret-input" placeholder="Nhập Secret Key..." value="secret_zalo_oa_live_key">
+          <label>Zalo Secret Key <span style="color:var(--alert-crimson);">*</span> (Tự động lưu F5)</label>
+          <input type="password" id="zalo-secret-input" placeholder="Nhập Secret Key..." value="" oninput="saveZaloDraftConfig()">
         </div>
       </div>
 
-      <div class="form-grid" style="grid-template-columns: 2fr 1fr; margin-bottom:12px;">
-        <div class="form-group">
-          <label>Callback Redirect URI</label>
-          <input type="text" id="zalo-redirect-input" placeholder="http://localhost:8080/" value="http://localhost:8080/">
+      <div class="form-group" style="margin-bottom:12px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+          <label>Callback Redirect URI <span style="color:var(--alert-crimson);">*</span></label>
+          <button style="padding:2px 8px; font-size:11px; background:rgba(37,99,235,0.1); border:none; border-radius:4px; color:var(--sapphire-accent); font-weight:600; cursor:pointer;" onclick="copyRedirectUri()">📋 Copy Redirect URI</button>
         </div>
-        <div class="form-group">
-          <label>Zalo OA ID (Tùy chọn)</label>
-          <input type="text" id="zalo-oaid-input" placeholder="VD: 84930291" value="84930291">
+        <input type="text" id="zalo-redirect-input" placeholder="http://localhost:8080/" value="http://localhost:8080/" oninput="saveZaloDraftConfig()" style="font-family:'JetBrains Mono'; font-size:13px;">
+        <div style="display:flex; gap:6px; margin-top:6px;">
+          <span style="font-size:11px; color:var(--muted-steel);">Chọn nhanh định dạng:</span>
+          <a href="javascript:void(0)" onclick="setRedirectUriFormat('with_slash')" style="font-size:11px; color:var(--sapphire-accent); font-weight:600;">http://localhost:8080/</a> | 
+          <a href="javascript:void(0)" onclick="setRedirectUriFormat('no_slash')" style="font-size:11px; color:var(--sapphire-accent); font-weight:600;">http://localhost:8080</a>
         </div>
+      </div>
+
+      <div class="form-group" style="margin-bottom:12px;">
+        <label>Zalo OA ID (Tùy chọn)</label>
+        <input type="text" id="zalo-oaid-input" placeholder="VD: 84930291" value="84930291" oninput="saveZaloDraftConfig()">
       </div>
 
       <!-- Step 2: Authorization Code / Access Token Input -->
       <div class="form-group" style="margin-bottom:14px; background:#FFFBEB; border:1px solid #FDE68A; padding:12px; border-radius:8px;">
         <label style="color:#B45309; font-weight:700; display:flex; justify-content:space-between;">
-          <span>🔑 Mã Authorization Code (Nhận được từ Zalo sau Bước 1)</span>
-          <span style="font-size:11px; font-weight:500;">Bắt buộc để đổi Token</span>
+          <span>🔑 Mã Authorization Code hoặc Access Token (Tự động lưu F5)</span>
+          <span style="font-size:11px; font-weight:500;">Bắt buộc</span>
         </label>
-        <input type="text" id="zalo-authcode-input" placeholder="Dán mã code nhận từ Zalo vào đây (hoặc dán Access Token trực tiếp)..." style="margin-top:6px; font-family:'JetBrains Mono'; font-size:12px;">
+        <input type="text" id="zalo-authcode-input" placeholder="Dán mã code nhận từ Zalo vào đây (hoặc dán Access Token trực tiếp)..." oninput="saveZaloDraftConfig()" style="margin-top:6px; font-family:'JetBrains Mono'; font-size:12px;">
         <div style="font-size:11px; color:#92400E; margin-top:4px;">
-          * Nếu bạn test thử nghiệm nhanh, có thể nhập bất kỳ mã code test nào (VD: <code>auth_code_test_123</code>).
+          * Bạn có thể dán <code>code</code> từ URL sau khi authorize, hoặc dán <code>Access Token</code> lấy từ <a href="https://developers.zalo.me/tools/explorer" target="_blank" style="color:#B45309; font-weight:700; text-decoration:underline;">Zalo API Explorer</a>.
         </div>
       </div>
 
@@ -530,6 +547,7 @@
 
     // 6. INITIALIZATION & URL CALLBACK HANDLER
     function initPage() {
+      loadZaloDraftConfig();
       handleOAuthCallbackOnLoad();
       renderTours();
       renderChannels();
@@ -540,6 +558,56 @@
         connectedOAs: zaloOAsState.filter(o => o.isAuthorized).length,
         version: 'OpenAPI v4 PKCE Client'
       });
+    }
+
+    // DRAFT PERSISTENCE (Saves across F5 reloads)
+    function saveZaloDraftConfig() {
+      const draft = {
+        appId: document.getElementById('zalo-appid-input')?.value || '',
+        secretKey: document.getElementById('zalo-secret-input')?.value || '',
+        redirectUri: document.getElementById('zalo-redirect-input')?.value || '',
+        oaId: document.getElementById('zalo-oaid-input')?.value || '',
+        authCode: document.getElementById('zalo-authcode-input')?.value || ''
+      };
+      localStorage.setItem('salehelp_zalo_draft_config', JSON.stringify(draft));
+    }
+
+    function loadZaloDraftConfig() {
+      const saved = localStorage.getItem('salehelp_zalo_draft_config');
+      if (saved) {
+        try {
+          const draft = JSON.parse(saved);
+          if (draft.appId && document.getElementById('zalo-appid-input')) document.getElementById('zalo-appid-input').value = draft.appId;
+          if (draft.secretKey && document.getElementById('zalo-secret-input')) document.getElementById('zalo-secret-input').value = draft.secretKey;
+          if (draft.redirectUri && document.getElementById('zalo-redirect-input')) document.getElementById('zalo-redirect-input').value = draft.redirectUri;
+          if (draft.oaId && document.getElementById('zalo-oaid-input')) document.getElementById('zalo-oaid-input').value = draft.oaId;
+          if (draft.authCode && document.getElementById('zalo-authcode-input')) document.getElementById('zalo-authcode-input').value = draft.authCode;
+        } catch (e) {}
+      } else {
+        const redirectEl = document.getElementById('zalo-redirect-input');
+        if (redirectEl && !redirectEl.value) {
+          redirectEl.value = window.location.origin + window.location.pathname;
+        }
+      }
+    }
+
+    function setRedirectUriFormat(format) {
+      const el = document.getElementById('zalo-redirect-input');
+      if (!el) return;
+      if (format === 'with_slash') {
+        el.value = 'http://localhost:8080/';
+      } else {
+        el.value = 'http://localhost:8080';
+      }
+      saveZaloDraftConfig();
+    }
+
+    function copyRedirectUri() {
+      const el = document.getElementById('zalo-redirect-input');
+      if (el) {
+        navigator.clipboard.writeText(el.value);
+        alert(`📋 Đã copy Callback Redirect URI: "${el.value}"\n\nHãy vào developers.zalo.me -> Chọn App -> Cài đặt -> Thêm URL này vào Callback URL.`);
+      }
     }
 
     function switchTab(tab) {
@@ -588,6 +656,7 @@
     }
 
     function launchZaloOAuthUrl() {
+      saveZaloDraftConfig();
       const appId = document.getElementById('zalo-appid-input').value.trim() || '38291049182049120';
       const redirectUri = encodeURIComponent(document.getElementById('zalo-redirect-input').value.trim() || (window.location.origin + window.location.pathname));
       const state = 'state_' + Date.now() + '_' + Math.random().toString(36).substring(2, 8);
@@ -1273,10 +1342,7 @@
       if (id === 'telegram_bot') {
         document.getElementById('modal-telegram').classList.add('active');
       } else if (id === 'zalo_oa') {
-        const redirectEl = document.getElementById('zalo-redirect-input');
-        if (redirectEl) redirectEl.value = window.location.origin + window.location.pathname;
-        const authCodeEl = document.getElementById('zalo-authcode-input');
-        if (authCodeEl) authCodeEl.value = '';
+        loadZaloDraftConfig();
         generateZaloPKCE();
         document.getElementById('modal-zalo').classList.add('active');
       } else if (id === 'fb_messenger') {
