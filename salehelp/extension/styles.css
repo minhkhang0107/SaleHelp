@@ -1,45 +1,58 @@
 /* ==============================================================================
-   SALEHELP ZALO AI COPILOT FLOATING WIDGET STYLES
+   SALEHELP ZALO AI COPILOT FLOATING WIDGET STYLES (V6 DRAGGABLE & COLLAPSIBLE)
    ============================================================================== */
 
 #salehelp-ai-widget {
   position: fixed;
   bottom: 24px;
   right: 24px;
-  z-index: 999999;
+  z-index: 9999999;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.15), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.2), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
   border-radius: 14px;
   background: #FFFFFF;
   border: 1px solid #E2E8F0;
-  width: 340px;
+  width: 350px;
   overflow: hidden;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: width 0.25s cubic-bezier(0.4, 0, 0.2, 1), height 0.25s cubic-bezier(0.4, 0, 0.2, 1), border-radius 0.25s ease;
   color: #0F172A;
+  box-sizing: border-box;
+}
+
+#salehelp-ai-widget.is-dragging {
+  transition: none !important;
+  user-select: none !important;
+  opacity: 0.95;
+  box-shadow: 0 20px 35px -5px rgba(0, 0, 0, 0.3);
 }
 
 #salehelp-ai-widget.minimized {
-  width: 48px;
-  height: 48px;
-  border-radius: 50%;
-  padding: 0;
-  cursor: pointer;
-  background: #0284C7;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 4px 12px rgba(2, 132, 199, 0.4);
+  width: 52px !important;
+  height: 52px !important;
+  border-radius: 50% !important;
+  padding: 0 !important;
+  cursor: pointer !important;
+  background: linear-gradient(135deg, #0284C7, #2563EB) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  box-shadow: 0 6px 16px rgba(2, 132, 199, 0.5) !important;
 }
 
 #salehelp-ai-widget.minimized .widget-body,
 #salehelp-ai-widget.minimized .widget-header {
-  display: none;
+  display: none !important;
 }
 
 #salehelp-ai-widget.minimized .minimized-icon {
-  display: block;
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
   color: white;
-  font-size: 24px;
+  font-size: 26px;
+  width: 100%;
+  height: 100%;
+  user-select: none;
 }
 
 .minimized-icon {
@@ -54,6 +67,11 @@
   justify-content: space-between;
   align-items: center;
   cursor: grab;
+  user-select: none;
+}
+
+.widget-header:active {
+  cursor: grabbing;
 }
 
 .widget-title {
@@ -67,7 +85,7 @@
 .widget-actions {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
 }
 
 .widget-btn-icon {
@@ -75,22 +93,24 @@
   border: none;
   color: white;
   border-radius: 4px;
-  width: 22px;
-  height: 22px;
+  width: 24px;
+  height: 24px;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  font-size: 11px;
+  font-size: 13px;
+  font-weight: 700;
+  transition: background 0.15s ease;
 }
 
 .widget-btn-icon:hover {
-  background: rgba(255, 255, 255, 0.35);
+  background: rgba(255, 255, 255, 0.4);
 }
 
 .widget-body {
   padding: 12px 14px;
-  max-height: 400px;
+  max-height: 420px;
   overflow-y: auto;
 }
 
@@ -112,8 +132,8 @@
 .widget-switch {
   position: relative;
   display: inline-block;
-  width: 36px;
-  height: 20px;
+  width: 38px;
+  height: 22px;
 }
 
 .widget-switch input {
@@ -130,19 +150,19 @@
   right: 0;
   bottom: 0;
   background-color: #CBD5E1;
-  transition: .3s;
-  border-radius: 20px;
+  transition: .25s;
+  border-radius: 22px;
 }
 
 .widget-slider:before {
   position: absolute;
   content: "";
-  height: 14px;
-  width: 14px;
+  height: 16px;
+  width: 16px;
   left: 3px;
   bottom: 3px;
   background-color: white;
-  transition: .3s;
+  transition: .25s;
   border-radius: 50%;
 }
 
@@ -186,19 +206,19 @@ input:checked + .widget-slider:before {
 }
 
 .btn-insert-send {
-  flex: 1;
   background: #0284C7;
   color: white;
   border: none;
   border-radius: 6px;
-  padding: 6px 10px;
-  font-size: 11px;
-  font-weight: 600;
+  padding: 7px 12px;
+  font-size: 11.5px;
+  font-weight: 700;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 4px;
+  transition: background 0.15s ease;
 }
 
 .btn-insert-send:hover {
@@ -206,18 +226,19 @@ input:checked + .widget-slider:before {
 }
 
 .btn-insert-only {
-  background: #E2E8F0;
+  background: #F1F5F9;
   color: #334155;
-  border: none;
+  border: 1px solid #CBD5E1;
   border-radius: 6px;
-  padding: 6px 10px;
-  font-size: 11px;
+  padding: 7px 12px;
+  font-size: 11.5px;
   font-weight: 600;
   cursor: pointer;
+  transition: background 0.15s ease;
 }
 
 .btn-insert-only:hover {
-  background: #CBD5E1;
+  background: #E2E8F0;
 }
 
 .status-indicator {

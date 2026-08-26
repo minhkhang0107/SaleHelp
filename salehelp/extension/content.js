@@ -1,10 +1,10 @@
 // ==============================================================================
-// SALEHELP ZALO AI COPILOT & MULTI-USER QUEUE CONTEXT MANAGER (V5 ENTERPRISE)
+// SALEHELP ZALO AI COPILOT & MULTI-USER QUEUE (V6 DRAGGABLE + ANTI-LIKE GUARD)
 // Injected into https://chat.zalo.me/*
 // ==============================================================================
 
 (function() {
-  console.log('🚀 [SaleHelp] AI Co-Pilot Extension v5 (Multi-User Queue & Isolated Context Memory) Loaded!');
+  console.log('🚀 [SaleHelp] AI Co-Pilot Extension v6 (Draggable + Anti-Like Guard) Loaded!');
 
   let config = {
     serverUrl: 'http://localhost:8080',
@@ -14,16 +14,15 @@
   };
 
   // Multi-user Isolated Conversation Memory Store
-  // Format: { [contactName]: [ { role: 'user'|'model', text: '...' } ] }
   let contactMemoryStore = {};
 
   // Sequential Multi-User Queue
-  // Array of { contactName, element, unreadCount, detectedMsg, timestamp }
   let processingQueue = [];
   let isQueueBusy = false;
   let currentActiveContact = '';
+  let lastGeneratedAnswer = '';
 
-  // Load configuration from Chrome Storage
+  // Load saved configuration from Chrome Storage
   if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
     chrome.storage.local.get(['salehelp_config', 'salehelp_memory'], (res) => {
       if (res.salehelp_config) {
@@ -47,27 +46,27 @@
     if (t) t.checked = config.autoReply;
   }
 
-  // 1. INJECT FLOATING WIDGET WITH QUEUE & CONTEXT DISPLAY
+  // 1. INJECT FLOATING WIDGET (DRAGGABLE & COLLAPSIBLE)
   function injectFloatingWidget() {
     if (document.getElementById('salehelp-ai-widget')) return;
 
     const widget = document.createElement('div');
     widget.id = 'salehelp-ai-widget';
     widget.innerHTML = `
-      <div class="minimized-icon" onclick="toggleWidgetMinimize(false)">🤖</div>
-      <div class="widget-header">
+      <div class="minimized-icon" id="salehelp-minimized-icon">🤖</div>
+      <div class="widget-header" id="salehelp-widget-header">
         <div class="widget-title">
-          <span>🤖 SaleHelp AI Co-Pilot v5</span>
+          <span>🤖 SaleHelp AI Co-Pilot v6</span>
         </div>
         <div class="widget-actions">
-          <button class="widget-btn-icon" onclick="toggleWidgetMinimize(true)" title="Thu nhỏ">_</button>
+          <button class="widget-btn-icon" id="salehelp-btn-minimize" title="Thu nhỏ">_</button>
         </div>
       </div>
       <div class="widget-body">
         <div class="widget-toggle-row">
-          <span class="widget-toggle-label">⚡ Tự động xử lý Queue (Auto-Reply)</span>
+          <span class="widget-toggle-label">⚡ Tự động trả lời (Auto-Reply)</span>
           <label class="widget-switch">
-            <input type="checkbox" id="salehelp-autoreply-toggle" ${config.autoReply ? 'checked' : ''} onchange="onAutoReplyToggle(this.checked)">
+            <input type="checkbox" id="salehelp-autoreply-toggle" ${config.autoReply ? 'checked' : ''}>
             <span class="widget-slider"></span>
           </label>
         </div>
@@ -96,10 +95,10 @@
 
         <!-- Quick Action Buttons -->
         <div style="display:flex; gap:6px; margin-bottom:8px;">
-          <button class="btn-insert-send" id="salehelp-manual-btn" style="flex:1; padding:8px; font-size:11px;" onclick="triggerManualReply()">
-            ⚡ Trả Lời Người Hiện Tại
+          <button class="btn-insert-send" id="salehelp-manual-btn" style="flex:1; padding:8px; font-size:11px;">
+            ⚡ Trả Lời Người Này
           </button>
-          <button class="btn-insert-only" style="padding:8px; font-size:11px;" onclick="copyLastAnswer()" title="Copy câu trả lời">
+          <button class="btn-insert-only" id="salehelp-copy-btn" style="padding:8px; font-size:11px;" title="Copy câu trả lời">
             📋 Copy
           </button>
         </div>
@@ -114,7 +113,122 @@
     `;
 
     document.body.appendChild(widget);
+
+    // 2. ATTACH UI EVENT LISTENERS
+    const minBtn = document.getElementById('salehelp-btn-minimize');
+    const minIcon = document.getElementById('salehelp-minimized-icon');
+    const autoToggle = document.getElementById('salehelp-autoreply-toggle');
+    const manualBtn = document.getElementById('salehelp-manual-btn');
+    const copyBtn = document.getElementById('salehelp-copy-btn');
+    const header = document.getElementById('salehelp-widget-header');
+
+    // Collapse / Expand
+    if (minBtn) {
+      minBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        widget.classList.add('minimized');
+      });
+    }
+
+    if (minIcon) {
+      minIcon.addEventListener('click', (e) => {
+        e.stopPropagation();
+        widget.classList.remove('minimized');
+      });
+    }
+
+    // Auto-Reply Toggle
+    if (autoToggle) {
+      autoToggle.addEventListener('change', (e) => {
+        config.autoReply = e.target.checked;
+        if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
+          chrome.storage.local.set({ salehelp_config: config });
+        }
+      });
+    }
+
+    // Manual Reply Trigger
+    if (manualBtn) {
+      manualBtn.addEventListener('click', () => {
+        const contact = getActiveContactName();
+        const text = detectLastIncomingMessageInActiveChat();
+        if (contact && text) {
+          processContactMessage(contact, text, true);
+        } else {
+          alert(`Không tìm thấy tin nhắn mới cần trả lời trong cuộc trò chuyện với "${contact}"!`);
+        }
+      });
+    }
+
+    // Copy Button
+    if (copyBtn) {
+      copyBtn.addEventListener('click', () => {
+        if (!lastGeneratedAnswer) {
+          alert('Chưa có câu trả lời nào từ AI!');
+          return;
+        }
+        navigator.clipboard.writeText(lastGeneratedAnswer);
+        alert('📋 Đã copy câu trả lời AI vào Clipboard:\n\n' + lastGeneratedAnswer);
+      });
+    }
+
+    // Drag-and-Drop Handler
+    enableWidgetDrag(widget, header);
+
     checkServerConnection();
+  }
+
+  // 3. SMOOTH DRAG AND DROP IMPLEMENTATION
+  function enableWidgetDrag(widget, dragHandle) {
+    let isDragging = false;
+    let startX, startY, initialLeft, initialTop;
+
+    dragHandle.addEventListener('mousedown', (e) => {
+      // Don't drag if clicking buttons
+      if (e.target.tagName === 'BUTTON' || e.target.tagName === 'INPUT') return;
+
+      isDragging = true;
+      widget.classList.add('is-dragging');
+
+      const rect = widget.getBoundingClientRect();
+      initialLeft = rect.left;
+      initialTop = rect.top;
+      startX = e.clientX;
+      startY = e.clientY;
+
+      widget.style.left = `${initialLeft}px`;
+      widget.style.top = `${initialTop}px`;
+      widget.style.right = 'auto';
+      widget.style.bottom = 'auto';
+
+      function onMouseMove(moveEvent) {
+        if (!isDragging) return;
+        const deltaX = moveEvent.clientX - startX;
+        const deltaY = moveEvent.clientY - startY;
+
+        let newLeft = initialLeft + deltaX;
+        let newTop = initialTop + deltaY;
+
+        // Keep inside screen bounds
+        newLeft = Math.max(10, Math.min(window.innerWidth - widget.offsetWidth - 10, newLeft));
+        newTop = Math.max(10, Math.min(window.innerHeight - widget.offsetHeight - 10, newTop));
+
+        widget.style.left = `${newLeft}px`;
+        widget.style.top = `${newTop}px`;
+      }
+
+      function onMouseUp() {
+        if (isDragging) {
+          isDragging = false;
+          widget.classList.remove('is-dragging');
+          window.removeEventListener('mousemove', onMouseMove);
+          window.removeEventListener('mouseup', onMouseUp);
+        }
+      }
+
+      window.addEventListener('mousemove', onMouseMove);
+      window.addEventListener('mouseup', onMouseUp);
+    });
   }
 
   async function checkServerConnection() {
@@ -138,33 +252,7 @@
     }
   }
 
-  window.toggleWidgetMinimize = function(minimize) {
-    const widget = document.getElementById('salehelp-ai-widget');
-    if (widget) {
-      if (minimize) widget.classList.add('minimized');
-      else widget.classList.remove('minimized');
-    }
-  };
-
-  window.onAutoReplyToggle = function(checked) {
-    config.autoReply = checked;
-    if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
-      chrome.storage.local.set({ salehelp_config: config });
-    }
-  };
-
-  let lastGeneratedAnswer = '';
-
-  window.copyLastAnswer = function() {
-    if (!lastGeneratedAnswer) {
-      alert('Chưa có câu trả lời nào từ AI!');
-      return;
-    }
-    navigator.clipboard.writeText(lastGeneratedAnswer);
-    alert('📋 Đã copy câu trả lời AI vào Clipboard:\n\n' + lastGeneratedAnswer);
-  };
-
-  // 2. GET CURRENT ACTIVE CONTACT NAME FROM HEADER
+  // 4. GET CURRENT ACTIVE CONTACT NAME FROM HEADER
   function getActiveContactName() {
     const headerTitleEl = document.querySelector('.header-title, .chat-title, .chat-name, div[data-id="header-name"], .conv-header__title, div[class*="header__title"], div[class*="title--name"]');
     if (headerTitleEl) {
@@ -172,7 +260,6 @@
       if (name) return name;
     }
 
-    // Fallback: active item in sidebar
     const activeSidebarItem = document.querySelector('.conv-item.active, .chat-item.active, div[class*="conv-item--active"], div[class*="item--selected"]');
     if (activeSidebarItem) {
       const nameEl = activeSidebarItem.querySelector('.name, .conv-item__name, .title, div[class*="name"]');
@@ -182,7 +269,7 @@
     return 'Khách hàng';
   }
 
-  // 3. EXTRACT FULL CONVERSATION HISTORY FROM ACTIVE CHAT WINDOW
+  // 5. EXTRACT CONVERSATION HISTORY FROM ACTIVE CHAT WINDOW
   function extractActiveChatHistory() {
     const chatViewArea = document.querySelector('#messageViewScroll') || 
                          document.querySelector('.chat-message-list') || 
@@ -196,7 +283,6 @@
     const history = [];
     const chatItems = Array.from(allBubbles).filter(el => el.offsetHeight > 0);
 
-    // Collect last 10 messages
     const startIndex = Math.max(0, chatItems.length - 10);
     for (let i = startIndex; i < chatItems.length; i++) {
       const el = chatItems[i];
@@ -224,12 +310,11 @@
     return history;
   }
 
-  // 4. DETECT LATEST UNREPLIED INCOMING MESSAGE IN ACTIVE CHAT
+  // 6. DETECT LATEST UNREPLIED INCOMING MESSAGE IN ACTIVE CHAT
   function detectLastIncomingMessageInActiveChat() {
     const history = extractActiveChatHistory();
     if (history.length === 0) return null;
 
-    // Check if the VERY LAST message in history is from 'user' (customer)
     const lastMsg = history[history.length - 1];
     if (lastMsg.role === 'user') {
       return lastMsg.text;
@@ -237,7 +322,7 @@
     return null;
   }
 
-  // 5. BULLETPROOF ZALO INPUT & SEND SUBMISSION
+  // 7. BULLETPROOF ZALO INPUT & ANTI-LIKE GUARD
   function executeZaloInputAndSubmit(text, autoSend = true) {
     const statusEl = document.getElementById('salehelp-dispatch-status');
     if (statusEl) {
@@ -286,11 +371,12 @@
     } catch (e) {}
 
     if (autoSend) {
-      if (statusEl) statusEl.innerText = '⚡ Đang bấm Gửi tin nhắn...';
+      if (statusEl) statusEl.innerText = '⚡ Đang gửi tin nhắn (Chống nút Like)...';
 
       setTimeout(() => {
         inputEl.focus();
 
+        // 1. Submit via Native Enter KeyboardEvent
         const enterParams = {
           key: 'Enter',
           code: 'Enter',
@@ -306,30 +392,22 @@
         inputEl.dispatchEvent(new KeyboardEvent('keypress', enterParams));
         inputEl.dispatchEvent(new KeyboardEvent('keyup', enterParams));
 
+        // 2. ANTI-LIKE BUTTON CLICKER (Strictly ignores any Like 👍 buttons!)
         setTimeout(() => {
-          const sendSelectors = [
-            '#btn_send',
-            '.btn-send',
-            '.send-btn',
-            'div[data-id="btn_send"]',
-            'div[data-translate-title="STR_SEND"]',
-            'div[title*="Gửi"]',
-            'div[title*="Send"]',
-            'div.chat-input__send',
-            'span[data-translate-inner="STR_SEND"]',
-            'i[class*="send"]',
-            'i[class*="paper-plane"]',
-            'div[class*="icon-send"]'
-          ];
+          const sendButtons = document.querySelectorAll(
+            'div[data-translate-title="STR_SEND"], div[title="Gửi"], div[title="Send"], span[data-translate-inner="STR_SEND"], i.fa-paper-plane'
+          );
 
-          sendSelectors.forEach(s => {
-            const btns = document.querySelectorAll(s);
-            btns.forEach(b => {
+          sendButtons.forEach(btn => {
+            // Strict Anti-Like check: never click if it contains thumb or like
+            const btnHtml = (btn.outerHTML || '').toLowerCase();
+            const isLikeBtn = btnHtml.includes('thumb') || btnHtml.includes('like') || btnHtml.includes('thích') || btnHtml.includes('str_like');
+            if (!isLikeBtn) {
               try {
-                b.click();
-                b.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }));
+                btn.click();
+                btn.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }));
               } catch (e) {}
-            });
+            }
           });
 
           if (statusEl) {
@@ -343,11 +421,10 @@
     return true;
   }
 
-  // 6. PROCESS MESSAGE WITH ISOLATED CONTEXT & GEMINI AI
+  // 8. PROCESS MESSAGE WITH ISOLATED CONTEXT & GEMINI AI
   async function processContactMessage(contactName, userText, isManual = false) {
     if (!userText || !contactName) return;
 
-    // Check if already replied recently
     const contactState = config.lastRepliedMap[contactName] || { lastText: '', timestamp: 0 };
     if (!isManual && contactState.lastText === userText && (Date.now() - contactState.timestamp < 60000)) {
       return;
@@ -366,13 +443,11 @@
       statusEl.innerText = `🤖 Gemini AI đang trả lời [${contactName}]...`;
     }
 
-    // 1. Get isolated conversation history for this specific contact
     const activeHistory = extractActiveChatHistory();
     contactMemoryStore[contactName] = activeHistory;
     saveMemoryToStorage();
 
-    // 2. Prepare History Context for Gemini API
-    const historyPayload = activeHistory.slice(0, activeHistory.length - 1); // exclude last query
+    const historyPayload = activeHistory.slice(0, activeHistory.length - 1);
 
     try {
       const sysPrompt = `Bạn là chuyên viên tư vấn Tour Du Lịch chuyên nghiệp, lịch sự, xưng em gọi anh/chị.
@@ -405,14 +480,12 @@ Hãy trả lời thân thiện, nhiệt tình, tư vấn chi tiết lịch trìn
 
       lastGeneratedAnswer = aiReply;
 
-      // Update memory store with AI's reply
       contactMemoryStore[contactName].push({
         role: 'model',
         text: aiReply
       });
       saveMemoryToStorage();
 
-      // Auto Send into Zalo Web input box
       if (config.autoReply || isManual) {
         console.log(`[SaleHelp] ⚡ [${contactName}] Tự động gửi sau ${config.delaySeconds}s...`);
         setTimeout(() => {
@@ -425,17 +498,7 @@ Hãy trả lời thân thiện, nhiệt tình, tư vấn chi tiết lịch trìn
     }
   }
 
-  window.triggerManualReply = function() {
-    const contact = getActiveContactName();
-    const text = detectLastIncomingMessageInActiveChat();
-    if (contact && text) {
-      processContactMessage(contact, text, true);
-    } else {
-      alert(`Không tìm thấy tin nhắn cần trả lời trong cuộc trò chuyện với "${contact}"!`);
-    }
-  };
-
-  // 7. MULTI-USER QUEUE SCANNER (Scans left sidebar for other incoming chats)
+  // 9. MULTI-USER QUEUE SCANNER (Scans left sidebar for other incoming chats)
   function scanSidebarForIncomingUsers() {
     const sidebarItems = document.querySelectorAll(
       '#conversationList .conv-item, .chat-item-list .chat-item, div[class*="conv-item"], div[class*="item--contact"]'
@@ -444,18 +507,15 @@ Hãy trả lời thân thiện, nhiệt tình, tư vấn chi tiết lịch trìn
     if (!sidebarItems || sidebarItems.length === 0) return;
 
     sidebarItems.forEach(item => {
-      // Find contact name in sidebar item
       const nameEl = item.querySelector('.name, .conv-item__name, .title, div[class*="name"]');
       const contactName = nameEl ? nameEl.innerText.trim().split('\n')[0] : '';
       if (!contactName) return;
 
-      // Check if this sidebar item has an unread badge
       const unreadBadge = item.querySelector(
         '.badge, .unread, .dot-unread, div[class*="unread"], div[class*="badge"], span[class*="badge"], .count'
       );
       const isUnread = unreadBadge !== null && unreadBadge.offsetHeight > 0;
 
-      // If this contact is NOT current active contact and has unread messages
       if (isUnread && contactName !== currentActiveContact) {
         const existing = processingQueue.find(q => q.contactName === contactName);
         if (!existing) {
@@ -490,7 +550,7 @@ Hãy trả lời thân thiện, nhiệt tình, tư vấn chi tiết lịch trìn
     }
   }
 
-  // 8. QUEUE WORKER: SEQUENTIALLY SWITCH TO NEXT USER IN QUEUE
+  // 10. QUEUE WORKER: SEQUENTIALLY SWITCH TO NEXT USER IN QUEUE
   async function processNextUserInQueue() {
     if (isQueueBusy || processingQueue.length === 0 || !config.autoReply) return;
 
@@ -506,12 +566,10 @@ Hãy trả lời thân thiện, nhiệt tình, tư vấn chi tiết lịch trìn
     }
 
     try {
-      // 1. Click on sidebar contact item
       if (nextUser.element) {
         nextUser.element.click();
       }
 
-      // 2. Wait 800ms for chat view to fully load
       await new Promise(r => setTimeout(r, 800));
 
       currentActiveContact = getActiveContactName();
@@ -521,7 +579,6 @@ Hãy trả lời thân thiện, nhiệt tình, tư vấn chi tiết lịch trìn
         await processContactMessage(currentActiveContact, detectedMsg, false);
       }
 
-      // 3. Wait for send delay before moving to next person
       await new Promise(r => setTimeout(r, (config.delaySeconds + 1.5) * 1000));
     } catch (e) {
       console.error('[SaleHelp] Lỗi khi xử lý hàng đợi:', e);
@@ -530,7 +587,7 @@ Hãy trả lời thân thiện, nhiệt tình, tư vấn chi tiết lịch trìn
     }
   }
 
-  // 9. MAIN HEARTBEAT LOOP (Runs every 1.5s)
+  // 11. MAIN HEARTBEAT LOOP (Runs every 1.5s)
   function startHeartbeatLoop() {
     setInterval(() => {
       currentActiveContact = getActiveContactName();
@@ -547,7 +604,6 @@ Hãy trả lời thân thiện, nhiệt tình, tư vấn chi tiết lịch trìn
         if (detectedMsgEl) detectedMsgEl.innerText = `"${unrepliedMsg.substring(0, 30)}..."`;
         if (manualBtn) manualBtn.innerText = `⚡ Trả Lời: "${unrepliedMsg.substring(0, 12)}..."`;
 
-        // If Auto-Reply is enabled and not busy
         if (config.autoReply && !isQueueBusy) {
           processContactMessage(currentActiveContact, unrepliedMsg, false);
         }
