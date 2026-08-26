@@ -269,29 +269,56 @@ const server = http.createServer(async (req, res) => {
         }
 
         const postData = JSON.stringify(geminiBody);
-        const options = {
-          hostname: 'generativelanguage.googleapis.com',
-          path: `/v1beta/models/${model}:generateContent?key=${apiKey}`,
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Content-Length': Buffer.byteLength(postData)
-          }
-        };
 
-        const result = await makeHttpsRequest(options, postData);
+        const candidateModels = [
+          model || 'gemini-flash-lite-latest',
+          'gemini-flash-lite-latest',
+          'gemini-3.1-flash-lite-preview',
+          'gemini-3-flash-preview',
+          'gemini-flash-latest'
+        ];
+
+        // Deduplicate
+        const uniqueModels = Array.from(new Set(candidateModels));
+        let result = null;
+        let successfulModel = '';
+
+        for (const m of uniqueModels) {
+          const options = {
+            hostname: 'generativelanguage.googleapis.com',
+            path: `/v1beta/models/${m}:generateContent?key=${apiKey}`,
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Content-Length': Buffer.byteLength(postData)
+            }
+          };
+
+          try {
+            const resData = await makeHttpsRequest(options, postData);
+            if (resData.status === 200 && resData.data && resData.data.candidates) {
+              result = resData;
+              successfulModel = m;
+              break;
+            } else {
+              result = resData;
+            }
+          } catch (e) {
+            result = { status: 500, data: { error: e.message } };
+          }
+        }
 
         // Broadcast action to Dashboard
         sendSSEEvent('action_log', {
           source: req.headers['origin'] ? 'Chrome Extension (Zalo Cá Nhân)' : 'SaleHelp Web App',
           type: 'GEMINI_AI_REPLY_GENERATED',
-          detail: `User query: "${prompt.substring(0, 35)}..." ➔ Model: ${model}`,
-          status: result.status === 200 ? 'SUCCESS 200' : 'ERROR ' + result.status,
+          detail: `Query: "${prompt.substring(0, 30)}..." ➔ Model: ${successfulModel || model}`,
+          status: result && result.status === 200 ? 'SUCCESS 200' : 'ERROR ' + (result?.status || 500),
           time: new Date().toLocaleTimeString()
         });
 
-        res.writeHead(result.status || 200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify(result.data));
+        res.writeHead(result && result.status === 200 ? 200 : (result?.status || 500), { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify(result ? result.data : { error: 'Unknown Gemini API Error' }));
       } catch (err) {
         res.writeHead(500, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ error: err.message }));

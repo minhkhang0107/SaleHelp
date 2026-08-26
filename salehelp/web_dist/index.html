@@ -2454,8 +2454,22 @@ TÊN KHÁCH HÀNG: "${conv.name}".
 
       if (outputEl) {
         outputEl.style.display = 'block';
-        outputEl.innerHTML = '<span style="color:#0284C7;">⏳ Gemini 3.6 Flash đang xử lý theo kịch bản này...</span>';
+        outputEl.innerHTML = '<span style="color:#0284C7;">⏳ Google Gemini AI đang đối chiếu Knowledge Base & xử lý theo kịch bản này...</span>';
       }
+
+      // Format live Knowledge Base block
+      const toursBlock = toursState
+        .filter(t => t.isActive)
+        .map((t, idx) => `[GÓI TOUR ${idx + 1}]\n• Tên Tour: ${t.title}\n• Giá trọn gói chính xác: ${t.price} / người\n• Chi tiết trọn gói: ${t.content}\n• Hạn sử dụng: ${t.expiryDate || 'Đang mở bán'}`)
+        .join('\n\n');
+
+      let sysPrompt = prompt
+        .replace(/{PERSONA_NAME}/g, personaState.name || 'Nguyễn Văn A')
+        .replace(/{PERSONA_TITLE}/g, personaState.title || 'Chuyên viên tư vấn Tour Chuyên nghiệp')
+        .replace(/{PERSONA_TONE}/g, personaState.tone || 'Lịch sự, nhiệt tình, xưng em gọi anh/chị')
+        .replace(/{CUSTOMER_NAME}/g, 'Chị Lan (Test Sandbox)');
+
+      sysPrompt += `\n\n📚 KHO DỮ LIỆU BẢNG GIÁ TOUR & DỊCH VỤ THỰC TẾ (LIVE KNOWLEDGE BASE):\n${toursBlock}`;
 
       try {
         const res = await fetch('/api/gemini/generate', {
@@ -2463,17 +2477,19 @@ TÊN KHÁCH HÀNG: "${conv.name}".
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             prompt: input,
-            systemInstruction: prompt.replace('{CUSTOMER_NAME}', 'Chị Lan (Test Sandbox)'),
-            model: 'gemini-3.6-flash'
+            systemInstruction: sysPrompt,
+            model: 'gemini-flash-lite-latest'
           })
         });
         const data = await res.json();
         if (data.candidates && data.candidates[0]?.content?.parts[0]?.text) {
           const aiText = data.candidates[0].content.parts[0].text;
           outputEl.innerHTML = `
-            <div style="font-weight:700; color:#10B981; margin-bottom:4px;">✅ KẾT QUẢ PHẢN HỒI THỬ NGHIỆM:</div>
-            <div style="white-space:pre-wrap;">${aiText}</div>
+            <div style="font-weight:700; color:#10B981; margin-bottom:6px;">✅ KẾT QUẢ PHẢN HỒI THỬ NGHIỆM:</div>
+            <div style="white-space:pre-wrap; line-height:1.5; color:#0F172A; background:#F8FAFC; padding:10px 12px; border-radius:8px; border:1px solid #E2E8F0;">${aiText}</div>
           `;
+        } else if (data.error) {
+          outputEl.innerHTML = `<span style="color:#EF4444;">❌ Lỗi Gemini API: ${typeof data.error === 'object' ? data.error.message : data.error}</span>`;
         } else {
           outputEl.innerHTML = '<span style="color:#EF4444;">❌ Không nhận được câu trả lời từ AI.</span>';
         }
