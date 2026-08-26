@@ -1,16 +1,23 @@
 // ==============================================================================
-// SALEHELP ZALO AI COPILOT (V9 BACKGROUND PROXY & FAIL-SAFE FETCH)
+// SALEHELP ZALO AI COPILOT (V10 ZERO-HALLUCINATION & STRICT KNOWLEDGE GROUNDING)
 // Injected into https://chat.zalo.me/*
 // ==============================================================================
 
 (function() {
-  console.log('🚀 [SaleHelp] AI Co-Pilot Extension v9 (Background Proxy & Live Knowledge Base) Loaded!');
+  console.log('🚀 [SaleHelp] AI Co-Pilot Extension v10 (Strict Grounding & Live Persona Sync) Loaded!');
 
   let config = {
     serverUrl: 'http://localhost:8080',
     autoReply: true,
     delaySeconds: 1.5,
     lastRepliedMap: {}, // { [contactName]: { lastText: '', timestamp: 0 } }
+  };
+
+  // Live Persona loaded from localhost:8080/api/persona
+  let livePersonaState = {
+    name: 'Nguyễn Văn A',
+    title: 'Chuyên viên tư vấn Tour Chuyên nghiệp (5 năm EXP)',
+    tone: 'Lịch sự, nhiệt tình, tư vấn chi tiết lịch trình, xưng em gọi anh/chị'
   };
 
   // Active Dynamic Skill loaded from localhost:8080/api/skills/active
@@ -34,7 +41,7 @@
 
   // Load saved configuration from Chrome Storage
   if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
-    chrome.storage.local.get(['salehelp_config', 'salehelp_memory', 'salehelp_active_skill', 'salehelp_tours'], (res) => {
+    chrome.storage.local.get(['salehelp_config', 'salehelp_memory', 'salehelp_active_skill', 'salehelp_tours', 'salehelp_persona'], (res) => {
       if (res.salehelp_config) {
         config = { ...config, ...res.salehelp_config };
         updateToggleState();
@@ -48,6 +55,9 @@
       }
       if (res.salehelp_tours && Array.isArray(res.salehelp_tours)) {
         liveToursState = res.salehelp_tours;
+      }
+      if (res.salehelp_persona) {
+        livePersonaState = res.salehelp_persona;
       }
     });
   }
@@ -72,7 +82,7 @@
   async function safeApiFetch(endpoint, options = {}) {
     const fullUrl = endpoint.startsWith('http') ? endpoint : `${config.serverUrl}${endpoint}`;
 
-    // 1. Try Extension Background Service Worker (100% immune to CORS & Mixed Content)
+    // 1. Try Extension Background Service Worker
     if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage) {
       try {
         const res = await new Promise((resolve, reject) => {
@@ -127,13 +137,27 @@
     }
   }
 
-  // 2. FETCH LIVE TOURS KNOWLEDGE BASE FROM LOCAL SERVER (:8080/api/tours)
+  // 2. FETCH LIVE PERSONA FROM LOCAL SERVER (:8080/api/persona)
+  async function fetchLivePersona() {
+    try {
+      const data = await safeApiFetch('/api/persona');
+      if (data && data.name) {
+        livePersonaState = data;
+        if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
+          chrome.storage.local.set({ salehelp_persona: data });
+        }
+      }
+    } catch (e) {
+      console.warn('[SaleHelp] Chưa lấy được persona từ server:', e.message);
+    }
+  }
+
+  // 3. FETCH LIVE TOURS KNOWLEDGE BASE FROM LOCAL SERVER (:8080/api/tours)
   async function fetchLiveToursKnowledge() {
     try {
       const data = await safeApiFetch('/api/tours');
       if (Array.isArray(data) && data.length > 0) {
         liveToursState = data;
-        console.log(`[SaleHelp] 📚 Đã tải ${liveToursState.length} tours từ Knowledge Base.`);
         if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
           chrome.storage.local.set({ salehelp_tours: data });
         }
@@ -145,15 +169,34 @@
 
   function formatToursKnowledgeBlock() {
     if (!liveToursState || liveToursState.length === 0) {
-      return `• Tour Đà Nẵng - Hội An - Bà Nà Hills 3N2Đ: 5.990.000 VNĐ/người (Trọn gói vé máy bay + Khách sạn 4 sao gần biển + Cáp treo Bà Nà + Ăn uống 3 bữa).\n• Voucher Combo Phú Quốc 4N3Đ VinWonders: 7.200.000 VNĐ/người.\n• Tour Du Thuyền Hạ Long 5 Sao 2N1Đ: 3.850.000 VNĐ/người.`;
+      return `[GÓI TOUR 1]
+• Tên Tour: Tour Đà Nẵng - Hội An - Bà Nà Hills 3N2Đ (3 Ngày 2 Đêm)
+• Giá trọn gói chính xác: 5,990,000 VNĐ / người (BẮT BUỘC BÁO ĐÚNG GIÁ 5,990,000 VNĐ)
+• Chi tiết trọn gói: Trọn gói vé máy bay khứ hồi + Khách sạn 4 sao gần biển Mỹ Khê + Vé cáp treo Bà Nà Hills + Ăn 5 bữa chính theo tour.
+• Hạn áp dụng: 2026-09-30 (Active)
+
+[GÓI TOUR 2]
+• Tên Tour: Voucher Giảm 20% Tour Phú Quốc 4N3Đ Combo VinWonders
+• Giá trọn gói chính xác: 7,200,000 VNĐ / người
+• Chi tiết trọn gói: Bao gồm vé máy bay khứ hồi + 3 đêm tại Vinholidays Fiesta Phú Quốc có buffet sáng + Vé vui chơi không giới hạn VinWonders & Safari + Xe đón tiễn sân bay.
+
+[GÓI TOUR 3]
+• Tên Tour: Tour Nha Trang - Biển Đảo 3N2Đ Khách Sạn 4 Sao
+• Giá trọn gói chính xác: 4,800,000 VNĐ / người
+• Chi tiết trọn gói: Vé máy bay khứ hồi + Khách sạn 4 sao trung tâm Trần Phú + Tour cano cao tốc tham quan 3 đảo Hòn Mun, Hòn Tằm lặn ngắm san hô + Tắm bùn khoáng nóng.`;
     }
+
     return liveToursState
       .filter(t => t.isActive)
-      .map((t, idx) => `• ${t.title}: ${t.price}/người\n  - Trọn gói gồm: ${t.content}\n  - Hạn áp dụng: ${t.expiryDate || 'Đang mở bán'}`)
-      .join('\n');
+      .map((t, idx) => `[GÓI TOUR ${idx + 1}]
+• Tên Tour: ${t.title}
+• Giá trọn gói chính xác: ${t.price} / người (BẮT BUỘC BÁO ĐÚNG MỨC GIÁ ${t.price}, CẤM TỰ Ý ĐỔI GIÁ)
+• Chi tiết trọn gói: ${t.content}
+• Hạn sử dụng: ${t.expiryDate || 'Đang mở bán'}`)
+      .join('\n\n');
   }
 
-  // 3. INJECT FLOATING WIDGET (DRAGGABLE & COLLAPSIBLE)
+  // 4. INJECT FLOATING WIDGET (DRAGGABLE & COLLAPSIBLE)
   function injectFloatingWidget() {
     if (document.getElementById('salehelp-ai-widget')) return;
 
@@ -163,7 +206,7 @@
       <div class="minimized-icon" id="salehelp-minimized-icon">🤖</div>
       <div class="widget-header" id="salehelp-widget-header">
         <div class="widget-title">
-          <span>🤖 SaleHelp AI v9</span>
+          <span>🤖 SaleHelp AI v10</span>
         </div>
         <div class="widget-actions">
           <button class="widget-btn-icon" id="salehelp-btn-minimize" title="Thu nhỏ">_</button>
@@ -229,7 +272,7 @@
 
     document.body.appendChild(widget);
 
-    // 4. ATTACH UI EVENT LISTENERS
+    // 5. ATTACH UI EVENT LISTENERS
     const minBtn = document.getElementById('salehelp-btn-minimize');
     const minIcon = document.getElementById('salehelp-minimized-icon');
     const autoToggle = document.getElementById('salehelp-autoreply-toggle');
@@ -286,10 +329,11 @@
     enableWidgetDrag(widget, header);
     checkServerConnection();
     fetchLiveActiveSkill();
+    fetchLivePersona();
     fetchLiveToursKnowledge();
   }
 
-  // 5. DRAG AND DROP
+  // 6. DRAG AND DROP
   function enableWidgetDrag(widget, dragHandle) {
     let isDragging = false;
     let startX, startY, initialLeft, initialTop;
@@ -361,7 +405,7 @@
     }
   }
 
-  // 6. GET CURRENT ACTIVE CONTACT NAME FROM HEADER
+  // 7. GET CURRENT ACTIVE CONTACT NAME FROM HEADER
   function getActiveContactName() {
     const headerTitleEl = document.querySelector('.header-title, .chat-title, .chat-name, div[data-id="header-name"], .conv-header__title, div[class*="header__title"], div[class*="title--name"]');
     if (headerTitleEl) {
@@ -378,7 +422,7 @@
     return 'Khách hàng';
   }
 
-  // 7. EXTRACT CONVERSATION HISTORY (ACCURATE & DEDUPLICATED)
+  // 8. EXTRACT CONVERSATION HISTORY (ACCURATE & DEDUPLICATED)
   function extractActiveChatHistory() {
     const chatViewArea = document.querySelector('#messageViewScroll') || 
                          document.querySelector('.chat-message-list') || 
@@ -423,7 +467,7 @@
     return history;
   }
 
-  // 8. DETECT LATEST UNREPLIED INCOMING MESSAGE IN ACTIVE CHAT
+  // 9. DETECT LATEST UNREPLIED INCOMING MESSAGE IN ACTIVE CHAT
   function detectLastIncomingMessageInActiveChat() {
     const history = extractActiveChatHistory();
     if (history.length === 0) return null;
@@ -435,7 +479,7 @@
     return null;
   }
 
-  // 9. BULLETPROOF ZALO INPUT & ANTI-LIKE GUARD
+  // 10. BULLETPROOF ZALO INPUT & ANTI-LIKE GUARD
   function executeZaloInputAndSubmit(text, autoSend = true) {
     const statusEl = document.getElementById('salehelp-dispatch-status');
     if (statusEl) {
@@ -530,7 +574,7 @@
     return true;
   }
 
-  // 10. PROCESS MESSAGE WITH ISOLATED CONTEXT & LIVE KNOWLEDGE BASE
+  // 11. PROCESS MESSAGE WITH ISOLATED CONTEXT & STRICT GROUNDING
   async function processContactMessage(contactName, userText, isManual = false) {
     if (!userText || !contactName) return;
 
@@ -561,23 +605,35 @@
     // Dynamic Live Knowledge Base Formatting
     const liveKnowledgeBlock = formatToursKnowledgeBlock();
 
-    // Build system prompt dynamically combining Active Skill + Live Knowledge Base
-    let sysPrompt = activeSkillConfig.systemPrompt || `BẠN LÀ CHUYÊN VIÊN TƯ VẤN & CHỐT ĐƠN TOUR DU LỊCH CAO CẤP.
-TÊN KHÁCH HÀNG: {CUSTOMER_NAME}.
+    // Strict Grounding & Zero-Hallucination System Prompt
+    let sysPrompt = `BẠN LÀ ${livePersonaState.name.toUpperCase()}, ${livePersonaState.title.toUpperCase()}.
+PHONG CÁCH TƯ VẤN: ${livePersonaState.tone}.
+TÊN KHÁCH HÀNG: ${contactName}.
 
-🎯 NGUYÊN TẮC CỐT LÕI (BẮT BUỘC TUÂN THỦ 100%):
-1. QUY TẮC BÁM SÁT NGỮ CẢNH & ĐỊA ĐIỂM (TOPIC LOCKING):
-   - Đọc kỹ toàn bộ lịch sử trò chuyện. Nếu khách hàng đã hỏi về ĐÀ NẴNG (hoặc bất kỳ địa điểm nào trước đó), bạn PHẢI TIẾP TỤC TƯ VẤN VỀ ĐÀ NẴNG.
-   - TUYỆT ĐỐI KHÔNG TỰ Ý ĐỔI SANG TOUR KHÁC (như Nha Trang, Phú Quốc...) trừ khi khách hàng chủ động nói muốn đổi địa điểm.
-2. VÀO THẲNG VẤN ĐỀ & BÁO GIÁ TRỌN GÓI:
-   - Nêu rõ giá tiền cụ thể / người và các dịch vụ đã bao gồm từ Kho Dữ Liệu Tour bên dưới.
-3. TUYỆT ĐỐI CẤM TÂM SỰ LAN MAN, CẤM KHEN THỜI TIẾT.
-4. LUÔN HỎI THÔNG TIN ĐỂ CHỐT ĐƠN Ở CUỐI (Ngày đi + Số lượng người).`;
+🎯 NGUYÊN TẮC BẮT BUỘC & CHỐNG BỊA ĐẶT THÔNG TIN (STRICT ZERO-HALLUCINATION):
+1. QUY TẮC BÁM SÁT 100% KHO DỮ LIỆU KNOWLEDGE BASE (GROUNDING):
+   - BẮT BUỘC dùng đúng Tên Tour, đúng Số Ngày/Đêm (ví dụ: Tour Đà Nẵng là "3N2Đ" - TUYỆT ĐỐI CẤM tự bịa thành "4N3Đ"), đúng Giá Bán (ví dụ: "5.990.000 VNĐ" - TUYỆT ĐỐI CẤM tự đổi thành "4.990.000 VNĐ") và đúng Chi Tiết Dịch Vụ đã được cấu hình trong Kho Dữ Liệu Tour bên dưới.
+   - TUYỆT ĐỐI CẤM tự ý bịa thêm điểm tham quan, tự sửa giá tiền hoặc tự tăng/giảm số ngày đêm của tour!
+2. QUY TẮC BÁM SÁT ĐỊA ĐIỂM (TOPIC LOCKING):
+   - Đọc kỹ lịch sử trò chuyện. Nếu khách đã hỏi về ĐÀ NẴNG (hoặc bất kỳ địa điểm nào), bạn PHẢI TIẾP TỤC TƯ VẤN VỀ ĐÀ NẴNG. Tuyệt đối không tự ý nhảy sang Nha Trang hay Phú Quốc.
+3. VÀO THẲNG VẤN ĐỀ & BÁO GIÁ TRỌN GÓI:
+   - Nêu đúng tên gói tour và giá tiền chính xác theo bảng giá. CẤM tuyệt đối khen thời tiết hay tâm sự phiếm.
+4. LUÔN HỎI THÔNG TIN ĐỂ CHỐT ĐƠN Ở CUỐI:
+   - "Anh/chị dự kiến đi vào ngày nào trong tháng và đoàn mình đi bao nhiêu người (lớn + trẻ em) để em kiểm tra vé máy bay giờ đẹp và giữ giá ưu đãi tốt nhất cho mình ạ?"
 
-    sysPrompt = sysPrompt.replace(/{CUSTOMER_NAME}/g, contactName);
+📚 KHO DỮ LIỆU BẢNG GIÁ TOUR & DỊCH VỤ THỰC TẾ (LIVE KNOWLEDGE BASE):
+${liveKnowledgeBlock}`;
 
-    // Append Live Knowledge Base to the prompt
-    sysPrompt += `\n\n📚 BẢNG GIÁ TOUR & DỊCH VỤ CẬP NHẬT TRỰC TIẾP TỪ KNOWLEDGE BASE DASHBOARD:\n${liveKnowledgeBlock}`;
+    // If active custom skill has a custom template, inject placeholders
+    if (activeSkillConfig && activeSkillConfig.systemPrompt) {
+      sysPrompt = activeSkillConfig.systemPrompt
+        .replace(/{PERSONA_NAME}/g, livePersonaState.name)
+        .replace(/{PERSONA_TITLE}/g, livePersonaState.title)
+        .replace(/{PERSONA_TONE}/g, livePersonaState.tone)
+        .replace(/{CUSTOMER_NAME}/g, contactName);
+      
+      sysPrompt += `\n\n📚 KHO DỮ LIỆU BẢNG GIÁ TOUR & DỊCH VỤ THỰC TẾ (LIVE KNOWLEDGE BASE):\n${liveKnowledgeBlock}`;
+    }
 
     try {
       const data = await safeApiFetch('/api/gemini/generate', {
@@ -618,7 +674,7 @@ TÊN KHÁCH HÀNG: {CUSTOMER_NAME}.
     }
   }
 
-  // 11. MULTI-USER QUEUE SCANNER
+  // 12. MULTI-USER QUEUE SCANNER
   function scanSidebarForIncomingUsers() {
     const sidebarItems = document.querySelectorAll(
       '#conversationList .conv-item, .chat-item-list .chat-item, div[class*="conv-item"], div[class*="item--contact"]'
@@ -670,7 +726,7 @@ TÊN KHÁCH HÀNG: {CUSTOMER_NAME}.
     }
   }
 
-  // 12. QUEUE WORKER
+  // 13. QUEUE WORKER
   async function processNextUserInQueue() {
     if (isQueueBusy || processingQueue.length === 0 || !config.autoReply) return;
 
@@ -707,7 +763,7 @@ TÊN KHÁCH HÀNG: {CUSTOMER_NAME}.
     }
   }
 
-  // 13. MAIN HEARTBEAT LOOP
+  // 14. MAIN HEARTBEAT LOOP
   function startHeartbeatLoop() {
     setInterval(() => {
       currentActiveContact = getActiveContactName();
@@ -740,9 +796,10 @@ TÊN KHÁCH HÀNG: {CUSTOMER_NAME}.
     }, 1500);
   }
 
-  // Periodically refresh active skill & live tours from server
+  // Periodically refresh active skill, persona & live tours from server
   setInterval(() => {
     fetchLiveActiveSkill();
+    fetchLivePersona();
     fetchLiveToursKnowledge();
   }, 8000);
 

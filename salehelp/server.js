@@ -422,6 +422,45 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  // 4d. Persona Configuration API
+  if (pathname === '/api/persona' && req.method === 'GET') {
+    const personaPath = path.join(__dirname, 'persona_config.json');
+    let data = { name: 'Nguyễn Văn A', title: 'Chuyên viên tư vấn Tour Chuyên nghiệp (5 năm EXP)', tone: 'Lịch sự, nhiệt tình, tư vấn chi tiết lịch trình, xưng em gọi anh/chị' };
+    if (fs.existsSync(personaPath)) {
+      try { data = JSON.parse(fs.readFileSync(personaPath, 'utf8')); } catch (e) {}
+    }
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify(data));
+    return;
+  }
+
+  if (pathname === '/api/persona/save' && req.method === 'POST') {
+    let body = '';
+    req.on('data', chunk => body += chunk);
+    req.on('end', () => {
+      try {
+        const payload = JSON.parse(body || '{}');
+        const personaPath = path.join(__dirname, 'persona_config.json');
+        fs.writeFileSync(personaPath, JSON.stringify(payload, null, 2), 'utf8');
+
+        sendSSEEvent('action_log', {
+          source: 'SaleHelp Dashboard',
+          type: 'PERSONA_UPDATED',
+          detail: `Persona updated: ${payload.name} (${payload.title})`,
+          status: 'SUCCESS',
+          time: new Date().toLocaleTimeString()
+        });
+
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: true, persona: payload }));
+      } catch (err) {
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: err.message }));
+      }
+    });
+    return;
+  }
+
   // 5. Real Telegram Send & Poll
   if (pathname === '/api/telegram/send' && req.method === 'POST') {
     let body = '';

@@ -799,6 +799,7 @@
       loadZaloDraftConfig();
       handleOAuthCallbackOnLoad();
       loadToursData();
+      loadPersonaData();
       renderChannels();
       renderChatDashboard();
       updateWebhookPayloadTemplate();
@@ -2230,11 +2231,36 @@ TÊN KHÁCH HÀNG: "${conv.name}".
       } catch (e) {}
     }
 
-    function savePersona() {
+    async function loadPersonaData() {
+      try {
+        const res = await fetch('/api/persona');
+        if (res.ok) {
+          const data = await res.json();
+          if (data && data.name) {
+            personaState = data;
+            const nameEl = document.getElementById('persona-name');
+            const titleEl = document.getElementById('persona-title');
+            const toneEl = document.getElementById('persona-tone');
+            if (nameEl) nameEl.value = personaState.name;
+            if (titleEl) titleEl.value = personaState.title;
+            if (toneEl) toneEl.value = personaState.tone;
+          }
+        }
+      } catch (e) {}
+    }
+
+    async function savePersona() {
       personaState.name = document.getElementById('persona-name').value;
       personaState.title = document.getElementById('persona-title').value;
       personaState.tone = document.getElementById('persona-tone').value;
-      alert('Đã lưu cấu hình Persona thành công! AI sẽ phản hồi theo tên: ' + personaState.name);
+      try {
+        await fetch('/api/persona/save', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(personaState)
+        });
+      } catch (e) {}
+      alert('Đã lưu cấu hình Persona thành công! AI và Chrome Extension sẽ phản hồi theo Persona: ' + personaState.name);
     }
 
     function saveTourEdit(id) {
