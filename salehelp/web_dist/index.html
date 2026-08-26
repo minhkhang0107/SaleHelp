@@ -228,6 +228,81 @@
     </div>
   </div>
 
+  <!-- ZALO OA AUTHORIZATION MODAL -->
+  <div class="modal-backdrop" id="modal-zalo">
+    <div class="modal-box">
+      <div class="modal-title">
+        <span class="material-symbols-outlined" style="color:#2563EB;">chat_bubble</span>
+        Ủy Quyền Zalo Official Account (PKCE)
+      </div>
+      <div style="font-size:13px; color:var(--muted-steel); margin-bottom:16px;">
+        Nhập App ID và Secret Key của Zalo Official Account App để khởi chạy luồng OAuth 2.0 PKCE:
+      </div>
+      <div class="form-group" style="margin-bottom:12px;">
+        <label>Zalo App ID</label>
+        <input type="text" id="zalo-appid-input" placeholder="VD: 38291049182049120" value="38291049182049120">
+      </div>
+      <div class="form-group" style="margin-bottom:16px;">
+        <label>Zalo Secret Key</label>
+        <input type="password" id="zalo-secret-input" placeholder="Nhập Zalo OA Secret Key..." value="secret_zalo_oa_live_key">
+      </div>
+      <div class="modal-footer">
+        <button style="padding:8px 16px; background:transparent; border:none; color:var(--muted-steel); font-weight:600; cursor:pointer;" onclick="closeModal('modal-zalo')">Hủy</button>
+        <button style="padding:8px 18px; background:var(--sapphire-accent); color:white; border:none; border-radius:8px; font-weight:600; cursor:pointer;" onclick="submitZaloAuth()">Xác Nhận & Ủy Quyền OAuth 2.0</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- FACEBOOK MESSENGER AUTHORIZATION MODAL -->
+  <div class="modal-backdrop" id="modal-facebook">
+    <div class="modal-box">
+      <div class="modal-title">
+        <span class="material-symbols-outlined" style="color:#4F46E5;">facebook</span>
+        Ủy Quyền Meta Graph API (Facebook Messenger)
+      </div>
+      <div style="font-size:13px; color:var(--muted-steel); margin-bottom:16px;">
+        Nhập Facebook Page ID và Page Access Token vĩnh viễn (hoặc Meta Business OAuth Token) để ủy quyền kết nối:
+      </div>
+      <div class="form-group" style="margin-bottom:12px;">
+        <label>Facebook Page ID / Page Name</label>
+        <input type="text" id="fb-pageid-input" placeholder="VD: Page: Du Lịch Việt Nam Fans" value="Page: Du Lịch Việt Nam Fans">
+      </div>
+      <div class="form-group" style="margin-bottom:16px;">
+        <label>Page Access Token (Permanent Token)</label>
+        <input type="password" id="fb-token-input" placeholder="EAAG..." value="EAAG_meta_page_token_live_secret">
+      </div>
+      <div class="modal-footer">
+        <button style="padding:8px 16px; background:transparent; border:none; color:var(--muted-steel); font-weight:600; cursor:pointer;" onclick="closeModal('modal-facebook')">Hủy</button>
+        <button style="padding:8px 18px; background:var(--sapphire-accent); color:white; border:none; border-radius:8px; font-weight:600; cursor:pointer;" onclick="submitFacebookAuth()">Xác Nhận & Kết Nối Meta OAuth</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- INSTAGRAM DIRECT AUTHORIZATION MODAL -->
+  <div class="modal-backdrop" id="modal-instagram">
+    <div class="modal-box">
+      <div class="modal-title">
+        <span class="material-symbols-outlined" style="color:#DB2777;">camera_alt</span>
+        Ủy Quyền Instagram Direct (Meta Business Graph API)
+      </div>
+      <div style="font-size:13px; color:var(--muted-steel); margin-bottom:16px;">
+        Nhập Instagram Business Account Handle và Meta Graph API Token:
+      </div>
+      <div class="form-group" style="margin-bottom:12px;">
+        <label>Instagram Handle</label>
+        <input type="text" id="insta-handle-input" placeholder="VD: @travel_insta_official" value="@travel_insta_official">
+      </div>
+      <div class="form-group" style="margin-bottom:16px;">
+        <label>Instagram User Access Token</label>
+        <input type="password" id="insta-token-input" placeholder="IGQV..." value="IGQV_meta_instagram_live_token">
+      </div>
+      <div class="modal-footer">
+        <button style="padding:8px 16px; background:transparent; border:none; color:var(--muted-steel); font-weight:600; cursor:pointer;" onclick="closeModal('modal-instagram')">Hủy</button>
+        <button style="padding:8px 18px; background:var(--sapphire-accent); color:white; border:none; border-radius:8px; font-weight:600; cursor:pointer;" onclick="submitInstagramAuth()">Xác Nhận & Liên Kết Instagram</button>
+      </div>
+    </div>
+  </div>
+
   <div class="modal-backdrop" id="modal-add-tour">
     <div class="modal-box" style="width:540px;">
       <div class="modal-title">
@@ -605,6 +680,12 @@
     function openAuthModal(id) {
       if (id === 'telegram_bot') {
         document.getElementById('modal-telegram').classList.add('active');
+      } else if (id === 'zalo_oa') {
+        document.getElementById('modal-zalo').classList.add('active');
+      } else if (id === 'fb_messenger') {
+        document.getElementById('modal-facebook').classList.add('active');
+      } else if (id === 'instagram_direct') {
+        document.getElementById('modal-instagram').classList.add('active');
       } else {
         toggleChannelAuth(id, true);
       }
@@ -632,12 +713,71 @@
       alert('Ủy quyền thành công Telegram Bot! Tin nhắn từ Telegram đã được mở khóa hiển thị trên Chat Dashboard.');
     }
 
+    function submitZaloAuth() {
+      const appId = document.getElementById('zalo-appid-input').value.trim();
+      const secret = document.getElementById('zalo-secret-input').value.trim();
+      if (!appId || !secret) {
+        alert('Vui lòng nhập Zalo App ID và Secret Key!');
+        return;
+      }
+      const zalo = channelsState.find(c => c.id === 'zalo_oa');
+      if (zalo) {
+        zalo.isAuthorized = true;
+        zalo.account = 'Zalo OA App ID: ' + appId;
+        zalo.expiresText = 'Access Token tự động làm mới qua OAuth 2.0 PKCE';
+      }
+      renderChannels();
+      renderChatDashboard();
+      closeModal('modal-zalo');
+      alert('Ủy quyền Zalo Official Account thành công! Token đã kích hoạt và sẵn sàng tư vấn tự động.');
+    }
+
+    function submitFacebookAuth() {
+      const pageId = document.getElementById('fb-pageid-input').value.trim();
+      const token = document.getElementById('fb-token-input').value.trim();
+      if (!pageId || !token) {
+        alert('Vui lòng nhập Page ID và Page Access Token!');
+        return;
+      }
+      const fb = channelsState.find(c => c.id === 'fb_messenger');
+      if (fb) {
+        fb.isAuthorized = true;
+        fb.account = pageId.startsWith('Page:') ? pageId : 'Page ID: ' + pageId;
+        fb.expiresText = 'Token vĩnh viễn (Page Token - Meta Business)';
+      }
+      renderChannels();
+      renderChatDashboard();
+      closeModal('modal-facebook');
+      alert('Ủy quyền Facebook Messenger thành công! Meta Graph API Webhook đã kết nối.');
+    }
+
+    function submitInstagramAuth() {
+      const handle = document.getElementById('insta-handle-input').value.trim();
+      const token = document.getElementById('insta-token-input').value.trim();
+      if (!handle || !token) {
+        alert('Vui lòng nhập Instagram Handle và Access Token!');
+        return;
+      }
+      const insta = channelsState.find(c => c.id === 'instagram_direct');
+      if (insta) {
+        insta.isAuthorized = true;
+        insta.account = 'Account: ' + (handle.startsWith('@') ? handle : '@' + handle);
+        insta.expiresText = 'Meta Graph API Instagram Active';
+      }
+      renderChannels();
+      renderChatDashboard();
+      closeModal('modal-instagram');
+      alert('Ủy quyền Instagram Direct thành công! Đã kết nối tài khoản.');
+    }
+
     function toggleChannelAuth(id, isAuth) {
       const channel = channelsState.find(c => c.id === id);
       if (channel) {
         channel.isAuthorized = isAuth;
         if (isAuth) {
           channel.expiresText = 'Ủy quyền thành công';
+          if (id === 'zalo_oa') channel.account = 'Zalo OA Connected';
+          if (id === 'fb_messenger') channel.account = 'Page Token Connected';
           if (id === 'telegram_bot') channel.account = 'Bot Token Connected';
           if (id === 'instagram_direct') channel.account = 'Account: @travel_insta_official';
           alert('Đã ủy quyền kết nối thành công với ' + channel.name);
