@@ -1,23 +1,24 @@
 // ==============================================================================
-// SALEHELP ZALO PERSONAL AI AUTO-RESPONDER & COPILOT (V3 ULTRA DETECTOR)
+// SALEHELP ZALO PERSONAL AI AUTO-RESPONDER & COPILOT (V4 BULLETPROOF DISPATCHER)
 // Injected into https://chat.zalo.me/*
 // ==============================================================================
 
 (function() {
-  console.log('🚀 [SaleHelp] AI Co-Pilot Extension v3 (Ultra Detector) Loaded!');
+  console.log('🚀 [SaleHelp] AI Co-Pilot Extension v4 (Bulletproof Input Dispatcher) Loaded!');
 
   let config = {
     serverUrl: 'http://localhost:8080',
     autoReply: true,
-    delaySeconds: 2,
+    delaySeconds: 1.5,
     lastRepliedMsgText: '',
     lastRepliedTimestamp: 0
   };
 
   let isSending = false;
   let currentDetectedMsg = '';
+  let lastGeneratedAnswer = '';
 
-  // Load saved configuration from storage
+  // Load saved configuration from Chrome Storage
   if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
     chrome.storage.local.get(['salehelp_config'], (res) => {
       if (res.salehelp_config) {
@@ -62,9 +63,14 @@
           <div id="salehelp-detected-msg" style="color:#0F172A; font-weight:600; min-height:16px;">Đang quét màn hình chat...</div>
         </div>
 
-        <button class="btn-insert-send" id="salehelp-manual-btn" style="width:100%; padding:9px; margin-bottom:10px;" onclick="triggerManualReply()">
-          ⚡ Bấm Để AI Trả Lời Ngay
-        </button>
+        <div style="display:flex; gap:6px; margin-bottom:10px;">
+          <button class="btn-insert-send" id="salehelp-manual-btn" style="flex:1; padding:8px; font-size:11px;" onclick="triggerManualReply()">
+            ⚡ Trả Lời Ngay
+          </button>
+          <button class="btn-insert-only" style="padding:8px; font-size:11px;" onclick="copyLastAnswer()" title="Copy câu trả lời">
+            📋 Copy
+          </button>
+        </div>
 
         <div class="suggestion-box" id="salehelp-suggestion-box" style="display:none;">
           <div class="suggestion-header">
@@ -72,10 +78,12 @@
           </div>
           <div class="suggestion-text" id="salehelp-suggestion-text">Đang suy nghĩ...</div>
           <div class="suggestion-actions">
-            <button class="btn-insert-send" onclick="applyAndSendSuggestion()">🚀 Chèn & Gửi</button>
-            <button class="btn-insert-only" onclick="applySuggestionOnly()">✏️ Chèn</button>
+            <button class="btn-insert-send" onclick="applyAndSendSuggestion()">🚀 Điền & Gửi</button>
+            <button class="btn-insert-only" onclick="applySuggestionOnly()">✏️ Chỉ Điền</button>
           </div>
         </div>
+
+        <div id="salehelp-dispatch-status" style="font-size:11px; color:#0284C7; font-weight:600; margin-bottom:6px; display:none;"></div>
 
         <div class="status-indicator">
           <span class="status-dot" id="salehelp-status-dot"></span>
@@ -124,96 +132,158 @@
     }
   };
 
-  let currentSuggestion = '';
+  window.copyLastAnswer = function() {
+    if (!lastGeneratedAnswer) {
+      alert('Chưa có câu trả lời nào từ AI!');
+      return;
+    }
+    navigator.clipboard.writeText(lastGeneratedAnswer);
+    alert('📋 Đã copy câu trả lời AI vào Clipboard:\n\n' + lastGeneratedAnswer);
+  };
 
   window.applyAndSendSuggestion = function() {
-    if (!currentSuggestion) return;
-    sendTextToZaloInput(currentSuggestion, true);
+    if (!lastGeneratedAnswer) return;
+    executeZaloInputAndSubmit(lastGeneratedAnswer, true);
     document.getElementById('salehelp-suggestion-box').style.display = 'none';
   };
 
   window.applySuggestionOnly = function() {
-    if (!currentSuggestion) return;
-    sendTextToZaloInput(currentSuggestion, false);
+    if (!lastGeneratedAnswer) return;
+    executeZaloInputAndSubmit(lastGeneratedAnswer, false);
     document.getElementById('salehelp-suggestion-box').style.display = 'none';
   };
 
-  // 2. ULTRA ROBUST ZALO INPUT DISPATCHER
-  function sendTextToZaloInput(text, autoSend = true) {
-    const inputEl = document.querySelector('div[contenteditable="true"]') || 
-                    document.querySelector('#input_content') || 
-                    document.querySelector('.rich-input') ||
-                    document.querySelector('textarea');
+  // 2. BULLETPROOF ZALO INPUT & SEND SUBMISSION
+  function executeZaloInputAndSubmit(text, autoSend = true) {
+    const statusEl = document.getElementById('salehelp-dispatch-status');
+    if (statusEl) {
+      statusEl.style.display = 'block';
+      statusEl.innerText = '✍️ Đang điền câu trả lời vào Zalo...';
+    }
+
+    // Find Zalo input element
+    let inputEl = document.querySelector('#input_content') || 
+                  document.querySelector('div[contenteditable="true"]') ||
+                  document.querySelector('.rich-input') ||
+                  document.querySelector('[data-id="chat-input"]') ||
+                  document.querySelector('textarea');
 
     if (!inputEl) {
       console.warn('[SaleHelp] ❌ Không tìm thấy ô nhập chat Zalo Web!');
-      alert('Không tìm thấy khung chat Zalo. Vui lòng mở cuộc trò chuyện trước!');
+      if (statusEl) statusEl.innerText = '❌ Không tìm thấy khung chat Zalo';
       return;
     }
 
+    // Step A: Focus input box and set selection
     inputEl.focus();
+    try {
+      const range = document.createRange();
+      const sel = window.getSelection();
+      range.selectNodeContents(inputEl);
+      range.collapse(false);
+      sel.removeAllRanges();
+      sel.addRange(range);
+    } catch (e) {}
 
-    // Clear and insert text
+    // Step B: Native execCommand (Select All -> Delete -> Insert Text)
     try {
       document.execCommand('selectAll', false, null);
       document.execCommand('delete', false, null);
       document.execCommand('insertText', false, text);
     } catch (e) {}
 
-    // Fallback: If execCommand didn't fill text
-    if (!inputEl.innerText || !inputEl.innerText.includes(text)) {
+    // Step C: Fallback innerText if empty
+    if (!inputEl.innerText || !inputEl.innerText.includes(text.substring(0, 10))) {
       inputEl.innerText = text;
     }
 
-    inputEl.dispatchEvent(new Event('input', { bubbles: true }));
-    inputEl.dispatchEvent(new Event('change', { bubbles: true }));
+    // Step D: Dispatch Events
+    try {
+      inputEl.dispatchEvent(new InputEvent('beforeinput', { bubbles: true, cancelable: true, inputType: 'insertText', data: text, composed: true }));
+      inputEl.dispatchEvent(new InputEvent('input', { bubbles: true, cancelable: true, inputType: 'insertText', data: text, composed: true }));
+      inputEl.dispatchEvent(new Event('change', { bubbles: true }));
+    } catch (e) {}
 
     if (autoSend) {
-      setTimeout(() => {
-        // Trigger Enter Key
-        const enterOpts = { bubbles: true, cancelable: true, keyCode: 13, which: 13, key: 'Enter', code: 'Enter' };
-        inputEl.dispatchEvent(new KeyboardEvent('keydown', enterOpts));
-        inputEl.dispatchEvent(new KeyboardEvent('keypress', enterOpts));
-        inputEl.dispatchEvent(new KeyboardEvent('keyup', enterOpts));
+      if (statusEl) statusEl.innerText = '⚡ Đang bấm Gửi tin nhắn...';
 
-        // Click Send button icon if Enter didn't dispatch
+      setTimeout(() => {
+        inputEl.focus();
+
+        // 1. Dispatch Enter KeyboardEvent sequence
+        const enterParams = {
+          key: 'Enter',
+          code: 'Enter',
+          keyCode: 13,
+          which: 13,
+          charCode: 13,
+          bubbles: true,
+          cancelable: true,
+          composed: true
+        };
+
+        inputEl.dispatchEvent(new KeyboardEvent('keydown', enterParams));
+        inputEl.dispatchEvent(new KeyboardEvent('keypress', enterParams));
+        inputEl.dispatchEvent(new KeyboardEvent('keyup', enterParams));
+
+        // 2. Click all possible Send Icon / Button Selectors on Zalo Web
         setTimeout(() => {
-          const sendBtns = document.querySelectorAll(
-            '.btn-send, div[data-translate-title="STR_SEND"], .send-btn, i[class*="send"], div[data-id="btn_send"]'
-          );
-          sendBtns.forEach(btn => btn.click());
-        }, 150);
-      }, 300);
+          const sendSelectors = [
+            '#btn_send',
+            '.btn-send',
+            '.send-btn',
+            'div[data-id="btn_send"]',
+            'div[data-translate-title="STR_SEND"]',
+            'div[title*="Gửi"]',
+            'div[title*="Send"]',
+            'div.chat-input__send',
+            'span[data-translate-inner="STR_SEND"]',
+            'i[class*="send"]',
+            'i[class*="paper-plane"]',
+            'div[class*="icon-send"]'
+          ];
+
+          sendSelectors.forEach(s => {
+            const btns = document.querySelectorAll(s);
+            btns.forEach(b => {
+              try {
+                b.click();
+                b.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }));
+              } catch (e) {}
+            });
+          });
+
+          if (statusEl) {
+            statusEl.innerText = `✅ Đã gửi phản hồi lúc ${new Date().toLocaleTimeString()}!`;
+            setTimeout(() => { statusEl.style.display = 'none'; }, 4000);
+          }
+        }, 200);
+      }, 400);
     }
   }
 
-  // 3. ULTRA DETECTOR: SCAN LATEST INCOMING MESSAGE IN ACTIVE CHAT
+  // 3. DETECT LAST INCOMING MESSAGE
   function detectLastIncomingMessage() {
-    // Collect all candidate message bubble elements
     const allBubbles = document.querySelectorAll(
       '.chat-item, .msg-item, .message-view, .chat-message, .msg-view, .card--text, div[data-id], .rel, .msg-info, .bubble-content, div[class*="chat-item"]'
     );
 
     if (!allBubbles || allBubbles.length === 0) return null;
 
-    // Filter elements in main chat window (exclude sidebar list)
     const chatViewArea = document.querySelector('#messageViewScroll') || 
                          document.querySelector('.chat-message-list') || 
                          document.querySelector('.chat-content') || 
                          document.body;
 
     const chatItems = Array.from(allBubbles).filter(el => {
-      // Must be inside main chat view and have visible height
       return chatViewArea.contains(el) && el.offsetHeight > 0;
     });
 
     if (chatItems.length === 0) return null;
 
-    // Scan from bottom-most item upwards
+    // Scan from bottom upwards
     for (let i = chatItems.length - 1; i >= 0; i--) {
       const el = chatItems[i];
-
-      // Check if message is sent by ME (align right / me class)
       const rect = el.getBoundingClientRect();
       const isMe = el.classList.contains('me') || 
                    el.classList.contains('msg-me') || 
@@ -221,22 +291,18 @@
                    el.closest('.me') !== null ||
                    el.querySelector('.me') !== null ||
                    el.style.justifyContent === 'flex-end' ||
-                   (rect.left > window.innerWidth * 0.55); // Located on right half of screen
+                   (rect.left > window.innerWidth * 0.55);
 
       if (!isMe) {
-        // This is an INCOMING message from the friend/customer
         const textNode = el.querySelector('.content, .text, .msg-text, .bubble-text, span, div.text') || el;
         let rawText = textNode ? textNode.innerText.trim() : '';
-
-        // Clean text (remove time like "13:33", emojis only, system notifications)
         rawText = rawText.replace(/\n\d{1,2}:\d{2}$/, '').trim();
 
         if (rawText && rawText.length >= 1 && !rawText.startsWith('🤖') && !rawText.includes('Sử dụng Zalo PC') && !rawText.includes('Hôm nay')) {
           return rawText;
         }
       } else {
-        // If the bottom-most message was sent by ME, then there is NO pending incoming message to reply!
-        // (We already replied to them!)
+        // If bottom-most message is ME, no reply needed!
         return null;
       }
     }
@@ -244,29 +310,35 @@
     return null;
   }
 
-  // 4. PROCESS MESSAGE AND CALL GEMINI AI
+  // 4. PROCESS INCOMING MESSAGE WITH GEMINI AI
   async function processIncomingMessage(text, isManual = false) {
     if (!text) return;
     if (isSending) return;
     if (!isManual && text === config.lastRepliedMsgText && (Date.now() - config.lastRepliedTimestamp < 60000)) {
-      return; // Already replied in the last 60s
+      return;
     }
 
     config.lastRepliedMsgText = text;
     config.lastRepliedTimestamp = Date.now();
     isSending = true;
 
-    console.log(`[SaleHelp] 🎯 Phát hiện tin nhắn cần trả lời: "${text}"`);
+    console.log(`[SaleHelp] 🎯 Đang gọi Gemini AI trả lời: "${text}"`);
 
     const sugBox = document.getElementById('salehelp-suggestion-box');
     const sugText = document.getElementById('salehelp-suggestion-text');
+    const statusEl = document.getElementById('salehelp-dispatch-status');
+
     if (sugBox && sugText) {
       sugBox.style.display = 'block';
-      sugText.innerText = `🤖 Gemini AI đang trả lời: "${text}"...`;
+      sugText.innerText = `🤖 Gemini AI đang sinh câu trả lời cho: "${text}"...`;
+    }
+    if (statusEl) {
+      statusEl.style.display = 'block';
+      statusEl.innerText = '🤖 Đang gọi Gemini 3.6 Flash AI...';
     }
 
     try {
-      const sysPrompt = `Bạn là chuyên viên tư vấn Tour Du Lịch nhiệt tình, lịch sự, xưng em gọi anh/chị. Khách hàng vừa nhắn tin: "${text}". Hãy trả lời chào hỏi thân thiện, giới thiệu tour Đà Nẵng 3N2Đ (giá 5,990,000đ) hoặc tour Phú Quốc (giá 7,500,000đ) và hỏi anh/chị cần tư vấn ngày nào để em hỗ trợ.`;
+      const sysPrompt = `Bạn là chuyên viên tư vấn Tour Du Lịch nhiệt tình, lịch sự, xưng em gọi anh/chị. Khách hàng vừa nhắn tin: "${text}". Hãy trả lời chào hỏi thân thiện, giới thiệu tour Đà Nẵng 3N2Đ (giá 5,990,000đ) hoặc tour Phú Quốc 4N3Đ (giá 7,500,000đ) và hỏi anh/chị cần tư vấn ngày nào để em hỗ trợ.`;
 
       const res = await fetch(`${config.serverUrl}/api/gemini/generate`, {
         method: 'POST',
@@ -283,23 +355,23 @@
       if (data.candidates && data.candidates[0]?.content?.parts[0]?.text) {
         aiReply = data.candidates[0].content.parts[0].text;
       } else {
-        aiReply = `Dạ em chào anh/chị! Em là nhân viên tư vấn du lịch. Anh/chị đang quan tâm đến tour du lịch nào để em gửi lịch trình và giá ưu đãi chi tiết ạ?`;
+        aiReply = `Dạ em chào anh/chị! Em là nhân viên tư vấn du lịch. Anh/chị đang quan tâm đến tour Đà Nẵng hay Phú Quốc để em gửi lịch trình và giá ưu đãi chi tiết ạ?`;
       }
 
-      currentSuggestion = aiReply;
+      lastGeneratedAnswer = aiReply;
       if (sugText) sugText.innerText = aiReply;
 
-      // If Auto-Reply is enabled, send automatically!
+      // Auto Send if enabled or manual
       if (config.autoReply || isManual) {
-        console.log(`[SaleHelp] ⚡ Tự động gửi câu trả lời sau ${config.delaySeconds}s...`);
+        console.log(`[SaleHelp] ⚡ Tự động gõ và gửi sau ${config.delaySeconds}s...`);
         setTimeout(() => {
-          sendTextToZaloInput(aiReply, true);
-          if (sugBox) sugBox.style.display = 'none';
+          executeZaloInputAndSubmit(aiReply, true);
         }, config.delaySeconds * 1000);
       }
     } catch (err) {
       console.error('[SaleHelp] Lỗi gọi Gemini AI:', err);
       if (sugText) sugText.innerText = '❌ Lỗi kết nối Server Gemini AI (:8080).';
+      if (statusEl) statusEl.innerText = '❌ Không thể kết nối Server Local (:8080)';
     } finally {
       setTimeout(() => { isSending = false; }, 3000);
     }
@@ -324,7 +396,7 @@
       if (msg) {
         currentDetectedMsg = msg;
         if (displayEl) displayEl.innerText = `"${msg}"`;
-        if (manualBtn) manualBtn.innerText = `⚡ Trả Lời Tin Nhắn: "${msg.substring(0, 15)}..."`;
+        if (manualBtn) manualBtn.innerText = `⚡ Trả Lời: "${msg.substring(0, 15)}..."`;
 
         // If Auto-Reply is enabled and not replied yet
         if (config.autoReply && msg !== config.lastRepliedMsgText && !isSending) {
@@ -333,7 +405,7 @@
       } else {
         currentDetectedMsg = '';
         if (displayEl) displayEl.innerText = 'Chưa có tin nhắn mới cần rep (Đã trả lời)';
-        if (manualBtn) manualBtn.innerText = '⚡ Bấm Để AI Trả Lời Ngay';
+        if (manualBtn) manualBtn.innerText = '⚡ Trả Lời Ngay';
       }
     }, 1500);
   }
