@@ -25,7 +25,7 @@ if (targetEnv) {
   }
 }
 
-// SSE Clients for Realtime Webhook events
+// SSE Clients for Realtime Webhook & Action events
 let sseClients = [];
 
 function sendSSEEvent(event, data) {
@@ -95,6 +95,14 @@ const server = http.createServer(async (req, res) => {
     });
     res.write(': connected\n\n');
     sseClients.push(res);
+
+    sendSSEEvent('action_log', {
+      source: 'SaleHelp Server',
+      type: 'CLIENT_CONNECTED',
+      detail: `Client connected to live SSE stream (Total clients: ${sseClients.length})`,
+      time: new Date().toLocaleTimeString()
+    });
+
     req.on('close', () => {
       sseClients = sseClients.filter(c => c !== res);
     });
@@ -133,6 +141,15 @@ const server = http.createServer(async (req, res) => {
         };
 
         const result = await makeHttpsRequest(options, postParams.toString());
+
+        sendSSEEvent('action_log', {
+          source: 'Zalo OAuth Proxy',
+          type: 'OAUTH_TOKEN_EXCHANGE',
+          detail: `Exchanged token for App ID: ${payload.appId}`,
+          status: result.status === 200 ? 'SUCCESS' : 'ERROR',
+          time: new Date().toLocaleTimeString()
+        });
+
         res.writeHead(result.status || 200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify(result.data));
       } catch (err) {
@@ -174,6 +191,15 @@ const server = http.createServer(async (req, res) => {
         };
 
         const result = await makeHttpsRequest(options, postBody);
+
+        sendSSEEvent('action_log', {
+          source: 'Zalo OA OpenAPI',
+          type: 'SEND_MESSAGE_DISPATCH',
+          detail: `Sent to user ${payload.userId}: "${payload.text?.substring(0, 30)}..."`,
+          status: 'HTTP ' + result.status,
+          time: new Date().toLocaleTimeString()
+        });
+
         res.writeHead(result.status || 200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify(result.data));
       } catch (err) {
@@ -192,7 +218,7 @@ const server = http.createServer(async (req, res) => {
       try {
         const payload = JSON.parse(body || '{}');
         const apiKey = payload.apiKey || GEMINI_API_KEY;
-        const model = payload.model || 'gemini-2.0-flash';
+        const model = payload.model || 'gemini-3.6-flash';
         const prompt = payload.prompt || '';
         const systemInstruction = payload.systemInstruction || '';
 
@@ -222,6 +248,16 @@ const server = http.createServer(async (req, res) => {
         };
 
         const result = await makeHttpsRequest(options, postData);
+
+        // Broadcast action to Dashboard
+        sendSSEEvent('action_log', {
+          source: req.headers['origin'] ? 'Chrome Extension (Zalo Cá Nhân)' : 'SaleHelp Web App',
+          type: 'GEMINI_AI_REPLY_GENERATED',
+          detail: `User query: "${prompt.substring(0, 35)}..." ➔ Model: ${model}`,
+          status: result.status === 200 ? 'SUCCESS 200' : 'ERROR ' + result.status,
+          time: new Date().toLocaleTimeString()
+        });
+
         res.writeHead(result.status || 200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify(result.data));
       } catch (err) {
@@ -255,6 +291,15 @@ const server = http.createServer(async (req, res) => {
         };
 
         const result = await makeHttpsRequest(options, postData);
+
+        sendSSEEvent('action_log', {
+          source: 'Telegram Bot API',
+          type: 'TELEGRAM_MESSAGE_SENT',
+          detail: `To Chat ID ${chatId}: "${text?.substring(0, 30)}..."`,
+          status: 'SUCCESS',
+          time: new Date().toLocaleTimeString()
+        });
+
         res.writeHead(result.status || 200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify(result.data));
       } catch (err) {
@@ -292,6 +337,15 @@ const server = http.createServer(async (req, res) => {
         };
 
         const result = await makeHttpsRequest(options, postData);
+
+        sendSSEEvent('action_log', {
+          source: 'Meta Graph API',
+          type: 'FACEBOOK_MESSENGER_SENT',
+          detail: `To recipient ${recipientId}: "${text?.substring(0, 30)}..."`,
+          status: 'SUCCESS',
+          time: new Date().toLocaleTimeString()
+        });
+
         res.writeHead(result.status || 200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify(result.data));
       } catch (err) {
@@ -316,6 +370,14 @@ const server = http.createServer(async (req, res) => {
           event: parsed,
           signature: sig,
           timestamp: Date.now()
+        });
+
+        sendSSEEvent('action_log', {
+          source: 'Zalo Webhook Ingest',
+          type: 'WEBHOOK_EVENT_INGESTED',
+          detail: `Event: ${parsed.event_name || 'unknown'} from sender ${parsed.sender?.id || 'anonymous'}`,
+          status: '200 OK',
+          time: new Date().toLocaleTimeString()
         });
 
         res.writeHead(200, { 'Content-Type': 'application/json' });

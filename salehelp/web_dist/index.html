@@ -724,6 +724,14 @@
       if (typeof EventSource !== 'undefined') {
         try {
           const evtSource = new EventSource('/api/events');
+          
+          evtSource.addEventListener('action_log', (e) => {
+            try {
+              const data = JSON.parse(e.data);
+              logApiTraffic(data.type || 'SERVER_ACTION', data.source || 'SaleHelp Server', data);
+            } catch (err) {}
+          });
+
           evtSource.addEventListener('webhook_received', (e) => {
             try {
               const data = JSON.parse(e.data);
