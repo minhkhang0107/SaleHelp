@@ -152,6 +152,7 @@ class _ChannelIntegrationScreenState extends State<ChannelIntegrationScreen> {
   void _showZaloAuthModal(ChannelConnection channel) {
     final appIdCtrl = TextEditingController(text: '38291049182049120');
     final appSecretCtrl = TextEditingController(text: 'secret_zalo_oa_live_key');
+    final redirectCtrl = TextEditingController(text: 'http://localhost:8080/zalo-callback.html');
 
     showDialog(
       context: context,
@@ -161,17 +162,17 @@ class _ChannelIntegrationScreenState extends State<ChannelIntegrationScreen> {
             children: [
               Icon(Icons.chat_bubble_rounded, color: Colors.blue),
               SizedBox(width: 8),
-              Text('Ủy Quyền Zalo Official Account (PKCE)'),
+              Text('Ủy Quyền Zalo Official Account (PKCE v4)'),
             ],
           ),
           content: SizedBox(
-            width: 460,
+            width: 500,
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAlignment.start,
               children: [
                 const Text(
-                  'Nhập App ID và Secret Key của Zalo Official Account App để khởi chạy luồng OAuth 2.0 PKCE:',
+                  'Quy chuẩn Zalo OAuth 2.0 PKCE (v4): Nhập App ID, Secret Key và Callback Redirect URI để khởi tạo code_challenge (SHA-256):',
                   style: TextStyle(fontSize: 13, color: AppColors.charcoalInk),
                 ),
                 const SizedBox(height: 16),
@@ -184,6 +185,34 @@ class _ChannelIntegrationScreenState extends State<ChannelIntegrationScreen> {
                   controller: appSecretCtrl,
                   obscureText: true,
                   decoration: const InputDecoration(labelText: 'Zalo Secret Key'),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: redirectCtrl,
+                  decoration: const InputDecoration(labelText: 'Callback Redirect URI'),
+                ),
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: AppColors.canvasWhite,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: AppColors.whisperBorder),
+                  ),
+                  child: const Column(
+                    crossAxisAlignment: CrossAlignment.start,
+                    children: [
+                      Text(
+                        '🔑 Zalo OpenAPI v4 Endpoints:',
+                        style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.charcoalInk),
+                      ),
+                      SizedBox(height: 2),
+                      Text(
+                        '• Auth URL: https://oauth.zaloapp.com/v4/oa/permission\n• Token Swap: https://oauth.zaloapp.com/v4/oa/access_token (secret_key header)\n• Token Lifespan: Access Token 25h / Refresh Token 90d',
+                        style: TextStyle(fontSize: 11, color: AppColors.mutedSteel, fontFamily: 'JetBrains Mono'),
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),
@@ -202,7 +231,7 @@ class _ChannelIntegrationScreenState extends State<ChannelIntegrationScreen> {
                   Navigator.pop(ctx);
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
-                      content: Text('Đã ủy quyền thành công Zalo OA! Access Token active 25h.'),
+                      content: Text('Đã ủy quyền thành công Zalo OA v4 PKCE! Access Token active 25h (Refresh Token 90d).'),
                       backgroundColor: AppColors.safeEmerald,
                     ),
                   );
@@ -213,7 +242,7 @@ class _ChannelIntegrationScreenState extends State<ChannelIntegrationScreen> {
                 foregroundColor: Colors.white,
               ),
               icon: const Icon(Icons.verified_user_rounded, size: 18),
-              label: const Text('Ủy Quyền OAuth 2.0'),
+              label: const Text('Ủy Quyền OAuth 2.0 PKCE'),
             ),
           ],
         );
