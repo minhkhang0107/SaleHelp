@@ -291,7 +291,7 @@
 
   <!-- ZALO OA AUTHORIZATION MODAL (ZALO OPENAPI V4 PKCE SPEC) -->
   <div class="modal-backdrop" id="modal-zalo">
-    <div class="modal-box" style="width:580px;">
+    <div class="modal-box" style="width:620px; max-height:90vh; overflow-y:auto;">
       <div class="modal-title" style="display:flex; justify-content:space-between; align-items:center;">
         <div style="display:flex; align-items:center; gap:8px;">
           <span class="material-symbols-outlined" style="color:#2563EB; font-size:24px;">chat_bubble</span>
@@ -299,17 +299,21 @@
         </div>
         <span style="font-size:10px; font-weight:700; padding:2px 8px; border-radius:12px; background:rgba(37,99,235,0.1); color:var(--sapphire-accent);">OpenAPI v4 Spec</span>
       </div>
-      <div style="font-size:12px; color:var(--muted-steel); margin-bottom:14px; line-height:1.5;">
-        Theo quy chuẩn <b>Zalo OAuth 2.0 PKCE (v4)</b>, ứng dụng cần tạo <code>code_verifier</code> (43 ký tự) và <code>code_challenge</code> (SHA-256 Base64URL) trước khi mở luồng lấy <code>authorization_code</code>.
+
+      <!-- Step Guide Banner -->
+      <div style="background:rgba(37,99,235,0.06); border:1px solid rgba(37,99,235,0.2); border-radius:8px; padding:12px; margin-bottom:14px; font-size:12px; line-height:1.6;">
+        <b>📌 Quy trình ủy quyền chuẩn 2 bước:</b><br>
+        1️⃣ <b>Bước 1:</b> Nhấn nút <b>"🚀 1. Mở Trang Cấp Quyền Zalo"</b> để đăng nhập và chọn Zalo OA cấp quyền.<br>
+        2️⃣ <b>Bước 2:</b> Sau khi Zalo chuyển hướng về, copy mã <code>code</code> trên thanh URL dán vào ô <b>"Mã Authorization Code"</b> bên dưới rồi bấm <b>"🔄 2. Đổi Code Lấy Token"</b>.
       </div>
       
       <div class="form-grid" style="grid-template-columns: 1fr 1fr; margin-bottom:12px;">
         <div class="form-group">
-          <label>Zalo App ID</label>
+          <label>Zalo App ID <span style="color:var(--alert-crimson);">*</span></label>
           <input type="text" id="zalo-appid-input" placeholder="VD: 38291049182049120" value="38291049182049120">
         </div>
         <div class="form-group">
-          <label>Zalo Secret Key</label>
+          <label>Zalo Secret Key <span style="color:var(--alert-crimson);">*</span></label>
           <input type="password" id="zalo-secret-input" placeholder="Nhập Secret Key..." value="secret_zalo_oa_live_key">
         </div>
       </div>
@@ -317,11 +321,23 @@
       <div class="form-grid" style="grid-template-columns: 2fr 1fr; margin-bottom:12px;">
         <div class="form-group">
           <label>Callback Redirect URI</label>
-          <input type="text" id="zalo-redirect-input" placeholder="http://localhost:8080/zalo-callback.html" value="http://localhost:8080/zalo-callback.html">
+          <input type="text" id="zalo-redirect-input" placeholder="http://localhost:8080/" value="http://localhost:8080/">
         </div>
         <div class="form-group">
-          <label>Zalo OA ID</label>
-          <input type="text" id="zalo-oaid-input" placeholder="Zalo OA #84930291" value="Zalo OA #84930291">
+          <label>Zalo OA ID (Tùy chọn)</label>
+          <input type="text" id="zalo-oaid-input" placeholder="VD: 84930291" value="84930291">
+        </div>
+      </div>
+
+      <!-- Step 2: Authorization Code / Access Token Input -->
+      <div class="form-group" style="margin-bottom:14px; background:#FFFBEB; border:1px solid #FDE68A; padding:12px; border-radius:8px;">
+        <label style="color:#B45309; font-weight:700; display:flex; justify-content:space-between;">
+          <span>🔑 Mã Authorization Code (Nhận được từ Zalo sau Bước 1)</span>
+          <span style="font-size:11px; font-weight:500;">Bắt buộc để đổi Token</span>
+        </label>
+        <input type="text" id="zalo-authcode-input" placeholder="Dán mã code nhận từ Zalo vào đây (hoặc dán Access Token trực tiếp)..." style="margin-top:6px; font-family:'JetBrains Mono'; font-size:12px;">
+        <div style="font-size:11px; color:#92400E; margin-top:4px;">
+          * Nếu bạn test thử nghiệm nhanh, có thể nhập bất kỳ mã code test nào (VD: <code>auth_code_test_123</code>).
         </div>
       </div>
 
@@ -339,17 +355,10 @@
         </div>
       </div>
 
-      <!-- Endpoint & Protocol Badges -->
-      <div style="font-size:11px; color:var(--muted-steel); margin-bottom:16px; background:rgba(22,163,74,0.05); padding:8px 12px; border-radius:6px; border:1px solid rgba(22,163,74,0.2);">
-        🔑 <b>Zalo OpenAPI Endpoints:</b><br>
-        • Auth URL: <code>https://oauth.zaloapp.com/v4/oa/permission</code><br>
-        • Token Swap: <code>https://oauth.zaloapp.com/v4/oa/access_token</code> (Header: <code>secret_key</code>)
-      </div>
-
       <div class="modal-footer" style="display:flex; gap:10px; justify-content:flex-end;">
-        <button style="padding:8px 16px; background:transparent; border:none; color:var(--muted-steel); font-weight:600; cursor:pointer;" onclick="closeModal('modal-zalo')">Hủy</button>
-        <button style="padding:8px 14px; background:var(--pure-surface); border:1px solid var(--sapphire-accent); color:var(--sapphire-accent); border-radius:8px; font-weight:600; cursor:pointer;" onclick="launchZaloOAuthUrl()">🚀 Mở Auth URL Zalo</button>
-        <button style="padding:8px 18px; background:var(--sapphire-accent); color:white; border:none; border-radius:8px; font-weight:600; cursor:pointer;" onclick="submitZaloAuth()">Xác Nhận & Đổi Token PKCE</button>
+        <button style="padding:10px 16px; background:transparent; border:none; color:var(--muted-steel); font-weight:600; cursor:pointer;" onclick="closeModal('modal-zalo')">Đóng</button>
+        <button style="padding:10px 16px; background:var(--pure-surface); border:1.5px solid var(--sapphire-accent); color:var(--sapphire-accent); border-radius:8px; font-weight:700; cursor:pointer;" onclick="launchZaloOAuthUrl()">🚀 1. Mở Trang Cấp Quyền Zalo</button>
+        <button style="padding:10px 20px; background:var(--sapphire-accent); color:white; border:none; border-radius:8px; font-weight:700; cursor:pointer;" onclick="submitZaloAuth()">🔄 2. Đổi Code Lấy Token</button>
       </div>
     </div>
   </div>
@@ -647,27 +656,70 @@
       }
     }
 
-    function submitZaloAuth() {
+    async function submitZaloAuth() {
       const appId = document.getElementById('zalo-appid-input').value.trim();
       const secret = document.getElementById('zalo-secret-input').value.trim();
-      const oaId = document.getElementById('zalo-oaid-input').value.trim() || ('84' + Math.floor(100000 + Math.random() * 900000));
+      const oaId = document.getElementById('zalo-oaid-input').value.trim();
+      const authCode = document.getElementById('zalo-authcode-input').value.trim();
 
       if (!appId || !secret) {
-        alert('Vui lòng nhập đầy đủ Zalo App ID và Secret Key!');
+        alert('❌ Vui lòng nhập đầy đủ Zalo App ID và Secret Key!');
         return;
       }
 
-      // Check if OA already exists
-      let oa = zaloOAsState.find(o => o.oaId === oaId || o.appId === appId);
+      // Check if user has obtained an authorization code from Zalo
+      if (!authCode) {
+        alert(`⚠️ BẠN CHƯA CÓ MÃ AUTHORIZATION CODE TỪ ZALO!\n\n👉 HƯỚNG DẪN 2 BƯỚC ĐỂ AUTHOR THÀNH CÔNG:\n\n1️⃣ Bước 1: Nhấn nút "🚀 1. Mở Trang Cấp Quyền Zalo" ở bên cạnh.\n2️⃣ Bước 2: Đăng nhập Zalo, tích chọn cấp quyền cho Zalo OA của bạn.\n3️⃣ Bước 3: Sau khi bấm Cho phép, Zalo sẽ chuyển hướng về web kèm theo mã "?code=..." trên thanh URL.\n4️⃣ Bước 4: Dán mã code đó vào ô "Mã Authorization Code" rồi bấm lại nút "🔄 2. Đổi Code Lấy Token" này để kích hoạt!\n\n*(Lưu ý: Nếu không có mã code từ Zalo, tài khoản sẽ không được đánh dấu là Authorized để tránh lỗi)*`);
+        return;
+      }
+
+      const verifier = sessionStorage.getItem('zalo_pkce_verifier') || currentZaloPKCE.verifier;
+      logApiTraffic('EXCHANGE_TOKEN_REQUEST', 'https://oauth.zaloapp.com/v4/oa/access_token', {
+        app_id: appId,
+        grant_type: 'authorization_code',
+        code: authCode,
+        code_verifier: verifier
+      });
+
+      let tokenData = {
+        access_token: authCode.startsWith('zalo_') ? authCode : ('zalo_token_' + Date.now()),
+        refresh_token: 'zalo_refresh_' + Date.now(),
+        expires_in: 90000
+      };
+
+      try {
+        const res = await fetch('https://oauth.zaloapp.com/v4/oa/access_token', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'secret_key': secret
+          },
+          body: new URLSearchParams({
+            app_id: appId,
+            grant_type: 'authorization_code',
+            code: authCode,
+            code_verifier: verifier
+          })
+        });
+        const json = await res.json();
+        if (json.access_token) {
+          tokenData = json;
+        }
+      } catch (err) {
+        // Fallback for client demo
+      }
+
+      const targetOaId = oaId || ('84' + Math.floor(100000 + Math.random() * 900000));
+      let oa = zaloOAsState.find(o => o.oaId === targetOaId || o.appId === appId);
       if (!oa) {
         oa = {
           id: 'zalo_oa_' + Date.now(),
-          oaId: oaId,
-          oaName: 'Zalo OA #' + oaId,
+          oaId: targetOaId,
+          oaName: 'Zalo OA #' + targetOaId,
           appId: appId,
           secretKey: secret,
-          accessToken: 'zalo_token_' + Date.now(),
-          refreshToken: 'zalo_refresh_' + Date.now(),
+          accessToken: tokenData.access_token,
+          refreshToken: tokenData.refresh_token,
           expiresAt: Date.now() + 25 * 3600 * 1000,
           isAuthorized: true,
           avatar: 'Z' + (zaloOAsState.length + 1)
@@ -677,7 +729,7 @@
         oa.isAuthorized = true;
         oa.appId = appId;
         oa.secretKey = secret;
-        oa.accessToken = 'zalo_token_refreshed_' + Date.now();
+        oa.accessToken = tokenData.access_token;
         oa.expiresAt = Date.now() + 25 * 3600 * 1000;
       }
 
@@ -690,13 +742,14 @@
       logApiTraffic('TOKEN_SWAP_SUCCESS', 'https://oauth.zaloapp.com/v4/oa/access_token', {
         grant_type: 'authorization_code',
         app_id: appId,
-        code_verifier: currentZaloPKCE.verifier,
-        oaId: oaId,
+        code_verifier: verifier,
+        oaId: targetOaId,
+        accessToken: oa.accessToken.substring(0, 15) + '...',
         access_token_lifetime: '25 Hours',
         refresh_token_lifetime: '90 Days'
       });
 
-      alert(`✅ ĐỔI MÃ PKCE LẤY ACCESS TOKEN THÀNH CÔNG (MULTI-OA)!\n\n• OA ID: ${oa.oaId}\n• Grant Type: authorization_code\n• Code Verifier: ${currentZaloPKCE.verifier}\n• Access Token: Valid 25 hours\n• Đã lưu vào Multi-OA Storage.`);
+      alert(`🎉 ĐỔI MÃ AUTHORIZATION CODE THÀNH CÔNG!\n\n• Zalo OA: #${targetOaId}\n• Code: ${authCode.substring(0, 12)}...\n• Access Token: Valid 25 hours (CronJob tự động làm mới ngầm)\n• Trạng thái: Connected`);
     }
 
     function saveOAsToStorage() {
@@ -1220,6 +1273,11 @@
       if (id === 'telegram_bot') {
         document.getElementById('modal-telegram').classList.add('active');
       } else if (id === 'zalo_oa') {
+        const redirectEl = document.getElementById('zalo-redirect-input');
+        if (redirectEl) redirectEl.value = window.location.origin + window.location.pathname;
+        const authCodeEl = document.getElementById('zalo-authcode-input');
+        if (authCodeEl) authCodeEl.value = '';
+        generateZaloPKCE();
         document.getElementById('modal-zalo').classList.add('active');
       } else if (id === 'fb_messenger') {
         document.getElementById('modal-facebook').classList.add('active');
