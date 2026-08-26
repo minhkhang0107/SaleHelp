@@ -501,7 +501,61 @@
     return null;
   }
 
-  // 10. BULLETPROOF ZALO INPUT & ANTI-LIKE GUARD
+  // 10. MULTI-TIER ROBUST ZALO CHAT INPUT ELEMENT FINDER
+  function findZaloChatInputElement() {
+    // Priority 1: Specific Zalo chat input element IDs & data attributes
+    const specificSelectors = [
+      '#input_content',
+      '#richInput',
+      '#chatInput',
+      '[data-id="chat-input"]',
+      'div[data-translate-placeholder*="CHAT"]',
+      'div[data-placeholder*="nhập"]',
+      'div[data-placeholder*="Nhập"]',
+      '.chat-input__content',
+      '.chat-input div[contenteditable="true"]',
+      '#chat-input-area div[contenteditable="true"]',
+      '.footer-chat div[contenteditable="true"]',
+      '.chat-box div[contenteditable="true"]',
+      'div[class*="chat-input"] div[contenteditable="true"]',
+      'div[class*="rich-input"]',
+      'div[role="textbox"]'
+    ];
+
+    for (const sel of specificSelectors) {
+      const el = document.querySelector(sel);
+      if (el && el.offsetHeight > 0 && !el.closest('#salehelp-ai-widget')) {
+        return el;
+      }
+    }
+
+    // Priority 2: Any contenteditable located in the chat area (exclude top-left search bar)
+    const allEditables = document.querySelectorAll('div[contenteditable="true"], [role="textbox"]');
+    for (const edit of allEditables) {
+      if (edit.offsetHeight > 0 && !edit.closest('#salehelp-ai-widget')) {
+        const rect = edit.getBoundingClientRect();
+        // Chat inputs are located in the right conversation panel or bottom half
+        if (rect.top > window.innerHeight * 0.35 || rect.left > window.innerWidth * 0.25) {
+          return edit;
+        }
+      }
+    }
+
+    // Priority 3: Fallback textarea / inputs
+    const allTextareas = document.querySelectorAll('textarea, input[type="text"]');
+    for (const ta of allTextareas) {
+      if (ta.offsetHeight > 0 && !ta.closest('#salehelp-ai-widget')) {
+        const rect = ta.getBoundingClientRect();
+        if (rect.top > window.innerHeight * 0.35 || rect.left > window.innerWidth * 0.25) {
+          return ta;
+        }
+      }
+    }
+
+    return null;
+  }
+
+  // 11. BULLETPROOF ZALO INPUT & ANTI-LIKE GUARD
   function executeZaloInputAndSubmit(text, autoSend = true) {
     const statusEl = document.getElementById('salehelp-dispatch-status');
     if (statusEl) {
@@ -509,15 +563,11 @@
       statusEl.innerText = '✍️ Đang điền câu trả lời vào Zalo...';
     }
 
-    const inputEl = document.querySelector('#input_content') || 
-                    document.querySelector('div[contenteditable="true"]') ||
-                    document.querySelector('.rich-input') ||
-                    document.querySelector('[data-id="chat-input"]') ||
-                    document.querySelector('textarea');
+    const inputEl = findZaloChatInputElement();
 
     if (!inputEl) {
-      console.warn('[SaleHelp] ❌ Không tìm thấy ô nhập chat Zalo Web!');
-      if (statusEl) statusEl.innerText = '❌ Không tìm thấy khung chat Zalo';
+      console.warn('[SaleHelp] ⚠️ Chưa chọn cuộc trò chuyện hoặc chưa mở khung chat Zalo Web!');
+      if (statusEl) statusEl.innerText = '⚠️ Vui lòng mở 1 cuộc trò chuyện Zalo';
       return false;
     }
 
