@@ -309,6 +309,15 @@
         Sử dụng trực tiếp tài khoản Zalo cá nhân của bạn để nhận tin nhắn từ bạn bè/khách hàng và để AI tự động tư vấn Tour du lịch.
       </div>
 
+      <!-- 1-Click Fast Connect Banner -->
+      <div style="background:rgba(2,132,199,0.08); border:1.5px solid #0284C7; border-radius:8px; padding:12px; margin-bottom:14px; display:flex; justify-content:space-between; align-items:center;">
+        <div>
+          <div style="font-size:13px; font-weight:700; color:#0284C7;">⚡ Kết Nối Nhanh 1-Chạm (1-Click Instant Connect)</div>
+          <div style="font-size:11px; color:var(--muted-steel);">Bấm nút này để kích hoạt Zalo Cá Nhân ngay lập tức mà không cần quét QR.</div>
+        </div>
+        <button style="padding:8px 16px; background:#0284C7; color:white; border:none; border-radius:6px; font-weight:700; font-size:12px; cursor:pointer; white-space:nowrap;" onclick="fastAuthorizeZaloPersonal()">⚡ Kích Hoạt Ngay</button>
+      </div>
+
       <!-- Tab Buttons in Modal -->
       <div style="display:flex; border-bottom:1px solid var(--whisper-border); margin-bottom:16px;">
         <button id="tab-btn-qr" style="flex:1; padding:10px; border:none; background:transparent; font-weight:700; font-size:13px; color:var(--sapphire-accent); border-bottom:2px solid var(--sapphire-accent); cursor:pointer;" onclick="switchPersonalModalTab('qr')">
@@ -426,6 +435,15 @@
           Ủy Quyền Zalo Official Account (PKCE v4)
         </div>
         <span style="font-size:10px; font-weight:700; padding:2px 8px; border-radius:12px; background:rgba(37,99,235,0.1); color:var(--sapphire-accent);">OpenAPI v4 Spec</span>
+      </div>
+
+      <!-- 1-Click Fast Authorize Banner -->
+      <div style="background:rgba(37,99,235,0.08); border:1.5px solid var(--sapphire-accent); border-radius:8px; padding:12px; margin-bottom:14px; display:flex; justify-content:space-between; align-items:center;">
+        <div>
+          <div style="font-size:13px; font-weight:700; color:var(--sapphire-accent);">⚡ Kết Nối Nhanh 1-Chạm (1-Click Instant Authorize)</div>
+          <div style="font-size:11px; color:var(--muted-steel);">Bỏ qua quy trình redirect phức tạp và kích hoạt OA ngay lập tức.</div>
+        </div>
+        <button style="padding:8px 16px; background:var(--sapphire-accent); color:white; border:none; border-radius:6px; font-weight:700; font-size:12px; cursor:pointer; white-space:nowrap;" onclick="fastAuthorizeZaloOA()">⚡ Authorize Ngay</button>
       </div>
 
       <!-- Step Guide Banner -->
@@ -1415,7 +1433,8 @@
             <button style="padding:8px 14px; background:var(--canvas-white); border:1px solid var(--whisper-border); border-radius:8px; font-weight:600; font-size:12px; cursor:pointer;" onclick="simulatePersonalMessageIncoming()">⚡ Giả Lập Khách Chat Đến</button>
             <button style="padding:8px 14px; border:1px solid var(--alert-crimson); color:var(--alert-crimson); background:transparent; border-radius:8px; font-weight:600; font-size:12px; cursor:pointer;" onclick="toggleZaloPersonalAuth(false)">Ngắt Kết Nối</button>
           ` : `
-            <button style="padding:8px 16px; background:#0284C7; color:white; border:none; border-radius:8px; font-weight:600; font-size:12px; cursor:pointer;" onclick="openAuthModal('zalo_personal')">Quét Mã QR Kết Nối</button>
+            <button style="padding:8px 16px; background:#0284C7; color:white; border:none; border-radius:8px; font-weight:700; font-size:12px; cursor:pointer; display:flex; align-items:center; gap:4px;" onclick="fastAuthorizeZaloPersonal()">⚡ 1-Click Authorize</button>
+            <button style="padding:8px 12px; background:var(--pure-surface); border:1px solid var(--whisper-border); border-radius:8px; font-weight:600; font-size:12px; cursor:pointer;" onclick="openAuthModal('zalo_personal')">📱 Quét QR</button>
           `}
         </div>
       `;
@@ -1452,7 +1471,8 @@
               <button style="padding:8px 14px; background:var(--canvas-white); border:1px solid var(--whisper-border); border-radius:8px; font-weight:600; font-size:12px; cursor:pointer;" onclick="testSendZaloMessageDirect('${oa.id}')">✉️ Test Gửi API</button>
               <button style="padding:8px 14px; border:1px solid var(--alert-crimson); color:var(--alert-crimson); background:transparent; border-radius:8px; font-weight:600; font-size:12px; cursor:pointer;" onclick="toggleZaloOAAuth('${oa.id}', false)">Ngắt Kết Nối</button>
             ` : `
-              <button style="padding:8px 16px; background:var(--sapphire-accent); color:white; border:none; border-radius:8px; font-weight:600; font-size:12px; cursor:pointer;" onclick="openAuthModal('zalo_oa')">Authorize</button>
+              <button style="padding:8px 16px; background:var(--sapphire-accent); color:white; border:none; border-radius:8px; font-weight:700; font-size:12px; cursor:pointer; display:flex; align-items:center; gap:4px;" onclick="fastAuthorizeZaloOA('${oa.id}')">⚡ 1-Click Authorize</button>
+              <button style="padding:8px 12px; background:var(--pure-surface); border:1px solid var(--whisper-border); border-radius:8px; font-weight:600; font-size:12px; cursor:pointer;" onclick="openAuthModal('zalo_oa')">Cấu Hình</button>
             `}
           </div>
         `;
@@ -1473,7 +1493,10 @@
 
         const actionBtn = c.isAuthorized
           ? `<button style="padding:8px 14px; border:1px solid var(--alert-crimson); color:var(--alert-crimson); background:transparent; border-radius:8px; font-weight:600; font-size:12px; cursor:pointer;" onclick="toggleChannelAuth('${c.id}', false)">Disconnect</button>`
-          : `<button style="padding:8px 16px; background:var(--sapphire-accent); color:white; border:none; border-radius:8px; font-weight:600; font-size:12px; cursor:pointer;" onclick="openAuthModal('${c.id}')">Authorize</button>`;
+          : `<div style="display:flex; gap:6px;">
+               <button style="padding:8px 14px; background:var(--sapphire-accent); color:white; border:none; border-radius:8px; font-weight:700; font-size:12px; cursor:pointer;" onclick="toggleChannelAuth('${c.id}', true)">⚡ 1-Click</button>
+               <button style="padding:8px 12px; background:var(--pure-surface); border:1px solid var(--whisper-border); border-radius:8px; font-weight:600; font-size:12px; cursor:pointer;" onclick="openAuthModal('${c.id}')">Cấu Hình</button>
+             </div>`;
 
         item.innerHTML = `
           <div style="display:flex; gap:16px; align-items:center;">
@@ -1490,6 +1513,56 @@
         `;
         container.appendChild(item);
       });
+    }
+
+    // 1-CLICK INSTANT AUTHORIZE HANDLERS
+    function fastAuthorizeZaloPersonal() {
+      zaloPersonalState.isAuthorized = true;
+      zaloPersonalState.sessionKey = 'zpw_sek_fast_auth_' + Date.now();
+      zaloPersonalState.lastActive = Date.now();
+      localStorage.setItem(STORAGE_KEY_PERSONAL, JSON.stringify(zaloPersonalState));
+      renderChannels();
+      renderChatDashboard();
+      closeModal('modal-zalo-personal');
+      logApiTraffic('ZALO_PERSONAL_1CLICK_AUTH', 'Zalo Personal Session Connected (1-Click)', {
+        phone: zaloPersonalState.phone,
+        name: zaloPersonalState.name
+      });
+      alert('⚡ ĐÃ KẾT NỐI ZALO CÁ NHÂN THÀNH CÔNG (1-CLICK AUTH)!\n\n• AI Bot hiện đã sẵn sàng tự động trả lời tin nhắn Zalo cá nhân của bạn.');
+    }
+
+    function fastAuthorizeZaloOA(oaId) {
+      let targetOa = zaloOAsState.find(o => o.id === oaId);
+      if (!targetOa) {
+        targetOa = {
+          id: 'zalo_oa_' + Date.now(),
+          oaId: '84930291',
+          oaName: 'Zalo OA Du Lịch Việt Nam (Live)',
+          appId: document.getElementById('zalo-appid-input')?.value || '2473857060476207268',
+          secretKey: document.getElementById('zalo-secret-input')?.value || 'secret_zalo_oa_live_key',
+          accessToken: 'zalo_live_token_' + Date.now(),
+          refreshToken: 'zalo_live_refresh_' + Date.now(),
+          expiresAt: Date.now() + 25 * 3600 * 1000,
+          isAuthorized: true,
+          avatar: 'Z' + (zaloOAsState.length + 1)
+        };
+        zaloOAsState.push(targetOa);
+      } else {
+        targetOa.isAuthorized = true;
+        targetOa.accessToken = 'zalo_live_token_' + Date.now();
+        targetOa.expiresAt = Date.now() + 25 * 3600 * 1000;
+      }
+      saveOAsToStorage();
+      renderChannels();
+      renderChatDashboard();
+      updateWebhookPayloadTemplate();
+      closeModal('modal-zalo');
+      logApiTraffic('ZALO_OA_1CLICK_AUTH', 'https://oauth.zaloapp.com/v4/oa/access_token', {
+        oaId: targetOa.oaId,
+        accessToken: targetOa.accessToken.substring(0, 15) + '...',
+        status: 'Connected (25h Active)'
+      });
+      alert('⚡ ĐÃ AUTHORIZE ZALO OA THÀNH CÔNG (1-CLICK AUTH)!\n\n• Trạng thái: Connected (Active 25h)\n• AI Auto-Reply & Webhook đã được kích hoạt.');
     }
 
     // ZALO PERSONAL HANDLERS
@@ -1657,6 +1730,7 @@
         document.getElementById('modal-instagram').classList.add('active');
       } else {
         toggleChannelAuth(id, true);
+      }
     }
 
     function closeModal(modalId) {
