@@ -377,6 +377,45 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  // 4c. Tours Knowledge Base (Live RAG Store) API
+  if (pathname === '/api/tours' && req.method === 'GET') {
+    const toursPath = path.join(__dirname, 'tours_config.json');
+    let data = [];
+    if (fs.existsSync(toursPath)) {
+      try { data = JSON.parse(fs.readFileSync(toursPath, 'utf8')); } catch (e) {}
+    }
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify(data));
+    return;
+  }
+
+  if (pathname === '/api/tours/save' && req.method === 'POST') {
+    let body = '';
+    req.on('data', chunk => body += chunk);
+    req.on('end', () => {
+      try {
+        const payload = JSON.parse(body || '[]');
+        const toursPath = path.join(__dirname, 'tours_config.json');
+        fs.writeFileSync(toursPath, JSON.stringify(payload, null, 2), 'utf8');
+
+        sendSSEEvent('action_log', {
+          source: 'SaleHelp Dashboard',
+          type: 'TOURS_KNOWLEDGE_UPDATED',
+          detail: `Tours database updated (${Array.isArray(payload) ? payload.length : 0} tours)`,
+          status: 'SUCCESS',
+          time: new Date().toLocaleTimeString()
+        });
+
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: true, count: payload.length }));
+      } catch (err) {
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: err.message }));
+      }
+    });
+    return;
+  }
+
   // 5. Real Telegram Send & Poll
   if (pathname === '/api/telegram/send' && req.method === 'POST') {
     let body = '';

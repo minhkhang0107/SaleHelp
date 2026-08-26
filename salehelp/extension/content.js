@@ -1,10 +1,10 @@
 // ==============================================================================
-// SALEHELP ZALO AI COPILOT & DYNAMIC SKILL ENGINE (V7 SKILL STUDIO INTEGRATION)
+// SALEHELP ZALO AI COPILOT (V8 LIVE KNOWLEDGE BASE & DYNAMIC SKILL ENGINE)
 // Injected into https://chat.zalo.me/*
 // ==============================================================================
 
 (function() {
-  console.log('🚀 [SaleHelp] AI Co-Pilot Extension v7 (Dynamic Skill Studio & Topic Locking) Loaded!');
+  console.log('🚀 [SaleHelp] AI Co-Pilot Extension v8 (Live Knowledge Base & Dynamic Skill Sync) Loaded!');
 
   let config = {
     serverUrl: 'http://localhost:8080',
@@ -20,6 +20,9 @@
     systemPrompt: ''
   };
 
+  // Live Dynamic Tours Knowledge Base loaded from localhost:8080/api/tours
+  let liveToursState = [];
+
   // Multi-user Isolated Conversation Memory Store
   let contactMemoryStore = {};
 
@@ -31,7 +34,7 @@
 
   // Load saved configuration from Chrome Storage
   if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
-    chrome.storage.local.get(['salehelp_config', 'salehelp_memory', 'salehelp_active_skill'], (res) => {
+    chrome.storage.local.get(['salehelp_config', 'salehelp_memory', 'salehelp_active_skill', 'salehelp_tours'], (res) => {
       if (res.salehelp_config) {
         config = { ...config, ...res.salehelp_config };
         updateToggleState();
@@ -42,6 +45,9 @@
       if (res.salehelp_active_skill) {
         activeSkillConfig = res.salehelp_active_skill;
         updateSkillUI();
+      }
+      if (res.salehelp_tours && Array.isArray(res.salehelp_tours)) {
+        liveToursState = res.salehelp_tours;
       }
     });
   }
@@ -62,7 +68,7 @@
     if (skillEl) skillEl.innerText = activeSkillConfig.name || '🎯 Chốt Đơn Tour';
   }
 
-  // Fetch Live Active Skill from Local Server
+  // 1. FETCH LIVE ACTIVE SKILL FROM LOCAL SERVER
   async function fetchLiveActiveSkill() {
     try {
       const res = await fetch(`${config.serverUrl}/api/skills/active`);
@@ -81,7 +87,36 @@
     }
   }
 
-  // 1. INJECT FLOATING WIDGET (DRAGGABLE & COLLAPSIBLE)
+  // 2. FETCH LIVE TOURS KNOWLEDGE BASE FROM LOCAL SERVER (:8080/api/tours)
+  async function fetchLiveToursKnowledge() {
+    try {
+      const res = await fetch(`${config.serverUrl}/api/tours`);
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data) && data.length > 0) {
+          liveToursState = data;
+          console.log(`[SaleHelp] 📚 Đã tải ${liveToursState.length} tours từ Knowledge Base Server.`);
+          if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
+            chrome.storage.local.set({ salehelp_tours: data });
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('[SaleHelp] Chưa lấy được tour knowledge từ server:', e);
+    }
+  }
+
+  function formatToursKnowledgeBlock() {
+    if (!liveToursState || liveToursState.length === 0) {
+      return `• Tour Đà Nẵng - Hội An - Bà Nà Hills 3N2Đ: 5.990.000 VNĐ/người (Trọn gói vé máy bay + Khách sạn 4 sao gần biển + Cáp treo Bà Nà + Ăn uống 3 bữa).\n• Voucher Combo Phú Quốc 4N3Đ VinWonders: 7.200.000 VNĐ/người.\n• Tour Du Thuyền Hạ Long 5 Sao 2N1Đ: 3.850.000 VNĐ/người.`;
+    }
+    return liveToursState
+      .filter(t => t.isActive)
+      .map((t, idx) => `• ${t.title}: ${t.price}/người\n  - Trọn gói gồm: ${t.content}\n  - Hạn áp dụng: ${t.expiryDate || 'Đang mở bán'}`)
+      .join('\n');
+  }
+
+  // 3. INJECT FLOATING WIDGET (DRAGGABLE & COLLAPSIBLE)
   function injectFloatingWidget() {
     if (document.getElementById('salehelp-ai-widget')) return;
 
@@ -91,7 +126,7 @@
       <div class="minimized-icon" id="salehelp-minimized-icon">🤖</div>
       <div class="widget-header" id="salehelp-widget-header">
         <div class="widget-title">
-          <span>🤖 SaleHelp AI v7</span>
+          <span>🤖 SaleHelp AI v8</span>
         </div>
         <div class="widget-actions">
           <button class="widget-btn-icon" id="salehelp-btn-minimize" title="Thu nhỏ">_</button>
@@ -108,8 +143,8 @@
 
         <!-- Live Skill Selector Badge -->
         <div style="background:#F8FAFC; border:1px solid #E2E8F0; border-radius:8px; padding:6px 10px; margin-bottom:8px; font-size:11px; display:flex; justify-content:space-between; align-items:center;">
-          <span style="color:#64748B; font-weight:600;">⚡ Skill áp dụng:</span>
-          <a href="http://localhost:8080" target="_blank" id="salehelp-active-skill-label" style="color:#0284C7; font-weight:700; text-decoration:none; max-width:180px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="Bấm để mở trang sửa Skill trên Dashboard">
+          <span style="color:#64748B; font-weight:600;">⚡ Skill & Knowledge:</span>
+          <a href="http://localhost:8080" target="_blank" id="salehelp-active-skill-label" style="color:#0284C7; font-weight:700; text-decoration:none; max-width:180px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="Bấm để mở trang sửa Skill & Tour trên Dashboard">
             🎯 Chốt Đơn Tour (Click sửa)
           </a>
         </div>
@@ -157,7 +192,7 @@
 
     document.body.appendChild(widget);
 
-    // 2. ATTACH UI EVENT LISTENERS
+    // 4. ATTACH UI EVENT LISTENERS
     const minBtn = document.getElementById('salehelp-btn-minimize');
     const minIcon = document.getElementById('salehelp-minimized-icon');
     const autoToggle = document.getElementById('salehelp-autoreply-toggle');
@@ -214,9 +249,10 @@
     enableWidgetDrag(widget, header);
     checkServerConnection();
     fetchLiveActiveSkill();
+    fetchLiveToursKnowledge();
   }
 
-  // 3. DRAG AND DROP
+  // 5. DRAG AND DROP
   function enableWidgetDrag(widget, dragHandle) {
     let isDragging = false;
     let startX, startY, initialLeft, initialTop;
@@ -288,7 +324,7 @@
     }
   }
 
-  // 4. GET CURRENT ACTIVE CONTACT NAME FROM HEADER
+  // 6. GET CURRENT ACTIVE CONTACT NAME FROM HEADER
   function getActiveContactName() {
     const headerTitleEl = document.querySelector('.header-title, .chat-title, .chat-name, div[data-id="header-name"], .conv-header__title, div[class*="header__title"], div[class*="title--name"]');
     if (headerTitleEl) {
@@ -305,25 +341,22 @@
     return 'Khách hàng';
   }
 
-  // 5. EXTRACT CONVERSATION HISTORY (ACCURATE & DEDUPLICATED)
+  // 7. EXTRACT CONVERSATION HISTORY (ACCURATE & DEDUPLICATED)
   function extractActiveChatHistory() {
     const chatViewArea = document.querySelector('#messageViewScroll') || 
                          document.querySelector('.chat-message-list') || 
                          document.querySelector('.chat-content') || 
                          document.body;
 
-    // Use only top-level item selectors to prevent nested duplicates
     const allBubbles = chatViewArea.querySelectorAll(
       '.chat-item, .msg-item, div[data-id]'
     );
 
     const history = [];
     const chatItems = Array.from(allBubbles).filter(el => {
-      // Must have content and not be a container of another selected item
       return el.offsetHeight > 0 && !el.querySelector('.chat-item, .msg-item');
     });
 
-    // Extract up to 20 past message turns
     const startIndex = Math.max(0, chatItems.length - 20);
     for (let i = startIndex; i < chatItems.length; i++) {
       const el = chatItems[i];
@@ -341,7 +374,6 @@
       rawText = rawText.replace(/\n\d{1,2}:\d{2}$/, '').trim();
 
       if (rawText && rawText.length > 0 && !rawText.startsWith('🤖') && !rawText.includes('Sử dụng Zalo PC') && !rawText.includes('Hôm nay')) {
-        // Deduplicate consecutive identical messages
         if (history.length === 0 || history[history.length - 1].text !== rawText) {
           history.push({
             role: isMe ? 'model' : 'user',
@@ -354,7 +386,7 @@
     return history;
   }
 
-  // 6. DETECT LATEST UNREPLIED INCOMING MESSAGE IN ACTIVE CHAT
+  // 8. DETECT LATEST UNREPLIED INCOMING MESSAGE IN ACTIVE CHAT
   function detectLastIncomingMessageInActiveChat() {
     const history = extractActiveChatHistory();
     if (history.length === 0) return null;
@@ -366,7 +398,7 @@
     return null;
   }
 
-  // 7. BULLETPROOF ZALO INPUT & ANTI-LIKE GUARD
+  // 9. BULLETPROOF ZALO INPUT & ANTI-LIKE GUARD
   function executeZaloInputAndSubmit(text, autoSend = true) {
     const statusEl = document.getElementById('salehelp-dispatch-status');
     if (statusEl) {
@@ -461,7 +493,7 @@
     return true;
   }
 
-  // 8. PROCESS MESSAGE WITH ISOLATED CONTEXT & DYNAMIC SKILL
+  // 10. PROCESS MESSAGE WITH ISOLATED CONTEXT & LIVE KNOWLEDGE BASE
   async function processContactMessage(contactName, userText, isManual = false) {
     if (!userText || !contactName) return;
 
@@ -480,7 +512,7 @@
     const statusEl = document.getElementById('salehelp-dispatch-status');
     if (statusEl) {
       statusEl.style.display = 'block';
-      statusEl.innerText = `🤖 Gemini AI đang trả lời [${contactName}] theo Skill...`;
+      statusEl.innerText = `🤖 Gemini AI đang tra cứu Knowledge Base & trả lời [${contactName}]...`;
     }
 
     const activeHistory = extractActiveChatHistory();
@@ -489,7 +521,10 @@
 
     const historyPayload = activeHistory.slice(0, activeHistory.length - 1);
 
-    // Build system prompt from live active skill with customer name
+    // Dynamic Live Knowledge Base Formatting
+    const liveKnowledgeBlock = formatToursKnowledgeBlock();
+
+    // Build system prompt dynamically combining Active Skill + Live Knowledge Base
     let sysPrompt = activeSkillConfig.systemPrompt || `BẠN LÀ CHUYÊN VIÊN TƯ VẤN & CHỐT ĐƠN TOUR DU LỊCH CAO CẤP.
 TÊN KHÁCH HÀNG: {CUSTOMER_NAME}.
 
@@ -498,17 +533,14 @@ TÊN KHÁCH HÀNG: {CUSTOMER_NAME}.
    - Đọc kỹ toàn bộ lịch sử trò chuyện. Nếu khách hàng đã hỏi về ĐÀ NẴNG (hoặc bất kỳ địa điểm nào trước đó), bạn PHẢI TIẾP TỤC TƯ VẤN VỀ ĐÀ NẴNG.
    - TUYỆT ĐỐI KHÔNG TỰ Ý ĐỔI SANG TOUR KHÁC (như Nha Trang, Phú Quốc...) trừ khi khách hàng chủ động nói muốn đổi địa điểm.
 2. VÀO THẲNG VẤN ĐỀ & BÁO GIÁ TRỌN GÓI:
-   - Nêu rõ giá tiền cụ thể / người và các dịch vụ đã bao gồm (Vé máy bay khứ hồi + Khách sạn + Ăn uống + Vé tham quan).
+   - Nêu rõ giá tiền cụ thể / người và các dịch vụ đã bao gồm từ Kho Dữ Liệu Tour bên dưới.
 3. TUYỆT ĐỐI CẤM TÂM SỰ LAN MAN, CẤM KHEN THỜI TIẾT.
-4. LUÔN HỎI THÔNG TIN ĐỂ CHỐT ĐƠN Ở CUỐI (Ngày đi + Số lượng người).
-
-📚 BẢNG GIÁ TOUR & DỊCH VỤ TRỌN GÓI:
-• Tour Đà Nẵng - Hội An - Bà Nà Hills 3N2Đ: 5.990.000 VNĐ/người (Trọn gói: Vé máy bay khứ hồi + Khách sạn 4 sao gần biển Mỹ Khê + Vé cáp treo Bà Nà + Ăn uống trọn gói).
-• Voucher Combo Phú Quốc 4N3Đ VinWonders: 7.200.000 VNĐ/người (Trọn gói: Vé máy bay khứ hồi + Resort 5 sao buffet sáng + Vé VinWonders & Safari).
-• Tour Du Thuyền Hạ Long 5 Sao 2N1Đ: 3.850.000 VNĐ/người (Trọn gói: Phòng ban công view biển + Đêm tiệc Gala Dinner + Chèo Kayak).
-• Tour Nha Trang 3N2Đ: 4.800.000 VNĐ/người (Trọn gói: Vé máy bay + Khách sạn 4 sao + Tour 3 đảo).`;
+4. LUÔN HỎI THÔNG TIN ĐỂ CHỐT ĐƠN Ở CUỐI (Ngày đi + Số lượng người).`;
 
     sysPrompt = sysPrompt.replace(/{CUSTOMER_NAME}/g, contactName);
+
+    // Append Live Knowledge Base to the prompt
+    sysPrompt += `\n\n📚 BẢNG GIÁ TOUR & DỊCH VỤ CẬP NHẬT TRỰC TIẾP TỪ KNOWLEDGE BASE DASHBOARD:\n${liveKnowledgeBlock}`;
 
     try {
       const res = await fetch(`${config.serverUrl}/api/gemini/generate`, {
@@ -550,7 +582,7 @@ TÊN KHÁCH HÀNG: {CUSTOMER_NAME}.
     }
   }
 
-  // 9. MULTI-USER QUEUE SCANNER
+  // 11. MULTI-USER QUEUE SCANNER
   function scanSidebarForIncomingUsers() {
     const sidebarItems = document.querySelectorAll(
       '#conversationList .conv-item, .chat-item-list .chat-item, div[class*="conv-item"], div[class*="item--contact"]'
@@ -602,7 +634,7 @@ TÊN KHÁCH HÀNG: {CUSTOMER_NAME}.
     }
   }
 
-  // 10. QUEUE WORKER
+  // 12. QUEUE WORKER
   async function processNextUserInQueue() {
     if (isQueueBusy || processingQueue.length === 0 || !config.autoReply) return;
 
@@ -639,7 +671,7 @@ TÊN KHÁCH HÀNG: {CUSTOMER_NAME}.
     }
   }
 
-  // 11. MAIN HEARTBEAT LOOP
+  // 13. MAIN HEARTBEAT LOOP
   function startHeartbeatLoop() {
     setInterval(() => {
       currentActiveContact = getActiveContactName();
@@ -672,8 +704,11 @@ TÊN KHÁCH HÀNG: {CUSTOMER_NAME}.
     }, 1500);
   }
 
-  // Periodically refresh active skill from server
-  setInterval(fetchLiveActiveSkill, 10000);
+  // Periodically refresh active skill & live tours from server
+  setInterval(() => {
+    fetchLiveActiveSkill();
+    fetchLiveToursKnowledge();
+  }, 8000);
 
   // Initialize
   setTimeout(() => {

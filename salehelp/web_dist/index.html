@@ -798,7 +798,7 @@
     function initPage() {
       loadZaloDraftConfig();
       handleOAuthCallbackOnLoad();
-      renderTours();
+      loadToursData();
       renderChannels();
       renderChatDashboard();
       updateWebhookPayloadTemplate();
@@ -2204,6 +2204,32 @@ TÊN KHÁCH HÀNG: "${conv.name}".
       if (el) el.classList.toggle('expanded');
     }
 
+    async function loadToursData() {
+      try {
+        const res = await fetch('/api/tours');
+        if (res.ok) {
+          const data = await res.json();
+          if (Array.isArray(data) && data.length > 0) {
+            toursState = data;
+            localStorage.setItem(STORAGE_KEY_TOURS, JSON.stringify(toursState));
+            renderTours();
+          }
+        }
+      } catch (e) {
+        console.warn('Lỗi tải danh sách tours từ server:', e);
+      }
+    }
+
+    async function syncToursToServer() {
+      try {
+        await fetch('/api/tours/save', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(toursState)
+        });
+      } catch (e) {}
+    }
+
     function savePersona() {
       personaState.name = document.getElementById('persona-name').value;
       personaState.title = document.getElementById('persona-title').value;
@@ -2218,14 +2244,16 @@ TÊN KHÁCH HÀNG: "${conv.name}".
         tour.price = document.getElementById('edit-price-' + id).value;
         tour.expiryDate = document.getElementById('edit-expiry-' + id).value;
         localStorage.setItem(STORAGE_KEY_TOURS, JSON.stringify(toursState));
+        syncToursToServer();
         renderTours();
-        alert('Đã lưu thay đổi cho tour: ' + tour.title + '\nTrạng thái RAG Search đã cập nhật!');
+        alert('Đã lưu thay đổi cho tour: ' + tour.title + '\nTrạng thái Knowledge Base & Chrome Extension đã cập nhật tức thì!');
       }
     }
 
     function deleteTour(id) {
       toursState = toursState.filter(t => t.id !== id);
       localStorage.setItem(STORAGE_KEY_TOURS, JSON.stringify(toursState));
+      syncToursToServer();
       renderTours();
       alert('Đã xóa tour khỏi hệ thống!');
     }
@@ -2256,9 +2284,10 @@ TÊN KHÁCH HÀNG: "${conv.name}".
 
       toursState.push(newTour);
       localStorage.setItem(STORAGE_KEY_TOURS, JSON.stringify(toursState));
+      syncToursToServer();
       renderTours();
       closeModal('modal-add-tour');
-      alert('Đã thêm tour mới thành công! RAG Search hiện đã nhận thông tin tour mới.');
+      alert('Đã thêm tour mới thành công! Knowledge Base & Chrome Extension hiện đã nhận thông tin tour mới.');
     }
 
     // 16. SKILLS & SALES PROMPT ENGINEERING HANDLERS

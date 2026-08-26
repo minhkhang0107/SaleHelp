@@ -1,0 +1,34 @@
+[
+  {
+    "id": "tour-1",
+    "title": "Tour Đà Nẵng - Hội An - Bà Nà Hills 3N2Đ",
+    "price": "5,990,000 VNĐ",
+    "expiryDate": "2026-09-30",
+    "content": "Trọn gói vé máy bay khứ hồi + Khách sạn 4 sao gần biển Mỹ Khê + Vé cáp treo Bà Nà Hills + Ăn 5 bữa chính theo tour.",
+    "isActive": true
+  },
+  {
+    "id": "tour-2",
+    "title": "Voucher Giảm 20% Tour Phú Quốc 4N3Đ Combo VinWonders",
+    "price": "7,200,000 VNĐ",
+    "expiryDate": "2026-10-15",
+    "content": "Bao gồm vé máy bay khứ hồi + 3 đêm tại Vinholidays Fiesta Phú Quốc có buffet sáng + Vé vui chơi không giới hạn VinWonders & Safari + Xe đón tiễn sân bay.",
+    "isActive": true
+  },
+  {
+    "id": "tour-3",
+    "title": "Tour Du Thuyền Hạ Long 5 Sao 2N1Đ Đêm Gala Dinner",
+    "price": "3,850,000 VNĐ",
+    "expiryDate": "2026-08-01",
+    "content": "Trải nghiệm du thuyền cao cấp 5 sao trên vịnh Hạ Long, phòng ban công view biển, đêm tiệc Gala Dinner, chèo thuyền Kayak thăm hang Sửng Sốt.",
+    "isActive": false
+  },
+  {
+    "id": "tour-4",
+    "title": "Tour Nha Trang - Biển Đảo 3N2Đ Khách Sạn 4 Sao",
+    "price": "4,800,000 VNĐ",
+    "expiryDate": "2026-11-30",
+    "content": "Vé máy bay khứ hồi + Khách sạn 4 sao trung tâm Trần Phú + Tour cano cao tốc tham quan 3 đảo Hòn Mun, Hòn Tằm lặn ngắm san hô + Tắm bùn khoáng nóng.",
+    "isActive": true
+  }
+]
