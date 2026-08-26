@@ -294,6 +294,89 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  // 4b. Skills & Prompt Management API
+  if (pathname === '/api/skills' && req.method === 'GET') {
+    const skillsPath = path.join(__dirname, 'skills_config.json');
+    let data = { activeSkillId: 'tour_closing_pro', skills: [] };
+    if (fs.existsSync(skillsPath)) {
+      try { data = JSON.parse(fs.readFileSync(skillsPath, 'utf8')); } catch (e) {}
+    }
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify(data));
+    return;
+  }
+
+  if (pathname === '/api/skills/active' && req.method === 'GET') {
+    const skillsPath = path.join(__dirname, 'skills_config.json');
+    let data = { activeSkillId: 'tour_closing_pro', skills: [] };
+    if (fs.existsSync(skillsPath)) {
+      try { data = JSON.parse(fs.readFileSync(skillsPath, 'utf8')); } catch (e) {}
+    }
+    const active = data.skills.find(s => s.id === data.activeSkillId) || data.skills[0];
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify(active || {}));
+    return;
+  }
+
+  if (pathname === '/api/skills/save' && req.method === 'POST') {
+    let body = '';
+    req.on('data', chunk => body += chunk);
+    req.on('end', () => {
+      try {
+        const payload = JSON.parse(body || '{}');
+        const skillsPath = path.join(__dirname, 'skills_config.json');
+        fs.writeFileSync(skillsPath, JSON.stringify(payload, null, 2), 'utf8');
+
+        sendSSEEvent('action_log', {
+          source: 'SaleHelp Dashboard',
+          type: 'SKILL_PROMPT_UPDATED',
+          detail: `Active Skill: "${payload.activeSkillId}" updated & persisted`,
+          status: 'SUCCESS',
+          time: new Date().toLocaleTimeString()
+        });
+
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: true, message: 'Skill configuration saved successfully!' }));
+      } catch (err) {
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: err.message }));
+      }
+    });
+    return;
+  }
+
+  if (pathname === '/api/skills/set-active' && req.method === 'POST') {
+    let body = '';
+    req.on('data', chunk => body += chunk);
+    req.on('end', () => {
+      try {
+        const payload = JSON.parse(body || '{}');
+        const skillsPath = path.join(__dirname, 'skills_config.json');
+        let data = { activeSkillId: 'tour_closing_pro', skills: [] };
+        if (fs.existsSync(skillsPath)) {
+          data = JSON.parse(fs.readFileSync(skillsPath, 'utf8'));
+        }
+        data.activeSkillId = payload.skillId;
+        fs.writeFileSync(skillsPath, JSON.stringify(data, null, 2), 'utf8');
+
+        sendSSEEvent('action_log', {
+          source: 'SaleHelp Dashboard',
+          type: 'ACTIVE_SKILL_CHANGED',
+          detail: `Switched active skill to: ${payload.skillId}`,
+          status: 'SUCCESS',
+          time: new Date().toLocaleTimeString()
+        });
+
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: true, activeSkillId: data.activeSkillId }));
+      } catch (err) {
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: err.message }));
+      }
+    });
+    return;
+  }
+
   // 5. Real Telegram Send & Poll
   if (pathname === '/api/telegram/send' && req.method === 'POST') {
     let body = '';

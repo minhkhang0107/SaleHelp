@@ -1,16 +1,23 @@
 // ==============================================================================
-// SALEHELP ZALO AI COPILOT & MULTI-USER QUEUE (V6 DRAGGABLE + ANTI-LIKE GUARD)
+// SALEHELP ZALO AI COPILOT & DYNAMIC SKILL ENGINE (V7 SKILL STUDIO INTEGRATION)
 // Injected into https://chat.zalo.me/*
 // ==============================================================================
 
 (function() {
-  console.log('🚀 [SaleHelp] AI Co-Pilot Extension v6 (Draggable + Anti-Like Guard) Loaded!');
+  console.log('🚀 [SaleHelp] AI Co-Pilot Extension v7 (Dynamic Skill Studio & Topic Locking) Loaded!');
 
   let config = {
     serverUrl: 'http://localhost:8080',
     autoReply: true,
     delaySeconds: 1.5,
     lastRepliedMap: {}, // { [contactName]: { lastText: '', timestamp: 0 } }
+  };
+
+  // Active Dynamic Skill loaded from localhost:8080/api/skills/active
+  let activeSkillConfig = {
+    id: 'tour_closing_pro',
+    name: '🎯 Tư Vấn & Chốt Đơn Tour (Mặc định)',
+    systemPrompt: ''
   };
 
   // Multi-user Isolated Conversation Memory Store
@@ -24,13 +31,17 @@
 
   // Load saved configuration from Chrome Storage
   if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
-    chrome.storage.local.get(['salehelp_config', 'salehelp_memory'], (res) => {
+    chrome.storage.local.get(['salehelp_config', 'salehelp_memory', 'salehelp_active_skill'], (res) => {
       if (res.salehelp_config) {
         config = { ...config, ...res.salehelp_config };
         updateToggleState();
       }
       if (res.salehelp_memory) {
         contactMemoryStore = res.salehelp_memory;
+      }
+      if (res.salehelp_active_skill) {
+        activeSkillConfig = res.salehelp_active_skill;
+        updateSkillUI();
       }
     });
   }
@@ -46,6 +57,30 @@
     if (t) t.checked = config.autoReply;
   }
 
+  function updateSkillUI() {
+    const skillEl = document.getElementById('salehelp-active-skill-label');
+    if (skillEl) skillEl.innerText = activeSkillConfig.name || '🎯 Chốt Đơn Tour';
+  }
+
+  // Fetch Live Active Skill from Local Server
+  async function fetchLiveActiveSkill() {
+    try {
+      const res = await fetch(`${config.serverUrl}/api/skills/active`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data && data.name) {
+          activeSkillConfig = data;
+          updateSkillUI();
+          if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
+            chrome.storage.local.set({ salehelp_active_skill: data });
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('[SaleHelp] Chưa lấy được skill từ server:', e);
+    }
+  }
+
   // 1. INJECT FLOATING WIDGET (DRAGGABLE & COLLAPSIBLE)
   function injectFloatingWidget() {
     if (document.getElementById('salehelp-ai-widget')) return;
@@ -56,7 +91,7 @@
       <div class="minimized-icon" id="salehelp-minimized-icon">🤖</div>
       <div class="widget-header" id="salehelp-widget-header">
         <div class="widget-title">
-          <span>🤖 SaleHelp AI Co-Pilot v6</span>
+          <span>🤖 SaleHelp AI v7</span>
         </div>
         <div class="widget-actions">
           <button class="widget-btn-icon" id="salehelp-btn-minimize" title="Thu nhỏ">_</button>
@@ -69,6 +104,14 @@
             <input type="checkbox" id="salehelp-autoreply-toggle" ${config.autoReply ? 'checked' : ''}>
             <span class="widget-slider"></span>
           </label>
+        </div>
+
+        <!-- Live Skill Selector Badge -->
+        <div style="background:#F8FAFC; border:1px solid #E2E8F0; border-radius:8px; padding:6px 10px; margin-bottom:8px; font-size:11px; display:flex; justify-content:space-between; align-items:center;">
+          <span style="color:#64748B; font-weight:600;">⚡ Skill áp dụng:</span>
+          <a href="http://localhost:8080" target="_blank" id="salehelp-active-skill-label" style="color:#0284C7; font-weight:700; text-decoration:none; max-width:180px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="Bấm để mở trang sửa Skill trên Dashboard">
+            🎯 Chốt Đơn Tour (Click sửa)
+          </a>
         </div>
 
         <!-- Active Contact & Context Card -->
@@ -122,7 +165,6 @@
     const copyBtn = document.getElementById('salehelp-copy-btn');
     const header = document.getElementById('salehelp-widget-header');
 
-    // Collapse / Expand
     if (minBtn) {
       minBtn.addEventListener('click', (e) => {
         e.stopPropagation();
@@ -137,7 +179,6 @@
       });
     }
 
-    // Auto-Reply Toggle
     if (autoToggle) {
       autoToggle.addEventListener('change', (e) => {
         config.autoReply = e.target.checked;
@@ -147,7 +188,6 @@
       });
     }
 
-    // Manual Reply Trigger
     if (manualBtn) {
       manualBtn.addEventListener('click', () => {
         const contact = getActiveContactName();
@@ -160,7 +200,6 @@
       });
     }
 
-    // Copy Button
     if (copyBtn) {
       copyBtn.addEventListener('click', () => {
         if (!lastGeneratedAnswer) {
@@ -172,20 +211,18 @@
       });
     }
 
-    // Drag-and-Drop Handler
     enableWidgetDrag(widget, header);
-
     checkServerConnection();
+    fetchLiveActiveSkill();
   }
 
-  // 3. SMOOTH DRAG AND DROP IMPLEMENTATION
+  // 3. DRAG AND DROP
   function enableWidgetDrag(widget, dragHandle) {
     let isDragging = false;
     let startX, startY, initialLeft, initialTop;
 
     dragHandle.addEventListener('mousedown', (e) => {
-      // Don't drag if clicking buttons
-      if (e.target.tagName === 'BUTTON' || e.target.tagName === 'INPUT') return;
+      if (e.target.tagName === 'BUTTON' || e.target.tagName === 'INPUT' || e.target.tagName === 'A') return;
 
       isDragging = true;
       widget.classList.add('is-dragging');
@@ -209,7 +246,6 @@
         let newLeft = initialLeft + deltaX;
         let newTop = initialTop + deltaY;
 
-        // Keep inside screen bounds
         newLeft = Math.max(10, Math.min(window.innerWidth - widget.offsetWidth - 10, newLeft));
         newTop = Math.max(10, Math.min(window.innerHeight - widget.offsetHeight - 10, newTop));
 
@@ -269,21 +305,26 @@
     return 'Khách hàng';
   }
 
-  // 5. EXTRACT CONVERSATION HISTORY FROM ACTIVE CHAT WINDOW
+  // 5. EXTRACT CONVERSATION HISTORY (ACCURATE & DEDUPLICATED)
   function extractActiveChatHistory() {
     const chatViewArea = document.querySelector('#messageViewScroll') || 
                          document.querySelector('.chat-message-list') || 
                          document.querySelector('.chat-content') || 
                          document.body;
 
+    // Use only top-level item selectors to prevent nested duplicates
     const allBubbles = chatViewArea.querySelectorAll(
-      '.chat-item, .msg-item, .message-view, .chat-message, .msg-view, .card--text, div[data-id], .bubble-content, div[class*="chat-item"]'
+      '.chat-item, .msg-item, div[data-id]'
     );
 
     const history = [];
-    const chatItems = Array.from(allBubbles).filter(el => el.offsetHeight > 0);
+    const chatItems = Array.from(allBubbles).filter(el => {
+      // Must have content and not be a container of another selected item
+      return el.offsetHeight > 0 && !el.querySelector('.chat-item, .msg-item');
+    });
 
-    const startIndex = Math.max(0, chatItems.length - 10);
+    // Extract up to 20 past message turns
+    const startIndex = Math.max(0, chatItems.length - 20);
     for (let i = startIndex; i < chatItems.length; i++) {
       const el = chatItems[i];
       const rect = el.getBoundingClientRect();
@@ -300,10 +341,13 @@
       rawText = rawText.replace(/\n\d{1,2}:\d{2}$/, '').trim();
 
       if (rawText && rawText.length > 0 && !rawText.startsWith('🤖') && !rawText.includes('Sử dụng Zalo PC') && !rawText.includes('Hôm nay')) {
-        history.push({
-          role: isMe ? 'model' : 'user',
-          text: rawText
-        });
+        // Deduplicate consecutive identical messages
+        if (history.length === 0 || history[history.length - 1].text !== rawText) {
+          history.push({
+            role: isMe ? 'model' : 'user',
+            text: rawText
+          });
+        }
       }
     }
 
@@ -344,7 +388,6 @@
 
     inputEl.focus();
 
-    // Selection range & native execCommand
     try {
       const range = document.createRange();
       const sel = window.getSelection();
@@ -376,7 +419,6 @@
       setTimeout(() => {
         inputEl.focus();
 
-        // 1. Submit via Native Enter KeyboardEvent
         const enterParams = {
           key: 'Enter',
           code: 'Enter',
@@ -392,14 +434,12 @@
         inputEl.dispatchEvent(new KeyboardEvent('keypress', enterParams));
         inputEl.dispatchEvent(new KeyboardEvent('keyup', enterParams));
 
-        // 2. ANTI-LIKE BUTTON CLICKER (Strictly ignores any Like 👍 buttons!)
         setTimeout(() => {
           const sendButtons = document.querySelectorAll(
             'div[data-translate-title="STR_SEND"], div[title="Gửi"], div[title="Send"], span[data-translate-inner="STR_SEND"], i.fa-paper-plane'
           );
 
           sendButtons.forEach(btn => {
-            // Strict Anti-Like check: never click if it contains thumb or like
             const btnHtml = (btn.outerHTML || '').toLowerCase();
             const isLikeBtn = btnHtml.includes('thumb') || btnHtml.includes('like') || btnHtml.includes('thích') || btnHtml.includes('str_like');
             if (!isLikeBtn) {
@@ -421,7 +461,7 @@
     return true;
   }
 
-  // 8. PROCESS MESSAGE WITH ISOLATED CONTEXT & GEMINI AI
+  // 8. PROCESS MESSAGE WITH ISOLATED CONTEXT & DYNAMIC SKILL
   async function processContactMessage(contactName, userText, isManual = false) {
     if (!userText || !contactName) return;
 
@@ -440,7 +480,7 @@
     const statusEl = document.getElementById('salehelp-dispatch-status');
     if (statusEl) {
       statusEl.style.display = 'block';
-      statusEl.innerText = `🤖 Gemini AI đang trả lời [${contactName}]...`;
+      statusEl.innerText = `🤖 Gemini AI đang trả lời [${contactName}] theo Skill...`;
     }
 
     const activeHistory = extractActiveChatHistory();
@@ -449,27 +489,28 @@
 
     const historyPayload = activeHistory.slice(0, activeHistory.length - 1);
 
-    try {
-      const sysPrompt = `BẠN LÀ CHUYÊN VIÊN TƯ VẤN & CHỐT ĐƠN TOUR DU LỊCH CAO CẤP (SALE CHUYÊN NGHIỆP).
-TÊN KHÁCH HÀNG: "${contactName}".
-XƯNG HÔ: Xưng "Em", gọi khách là "Anh/Chị" (hoặc gọi "Chị", "Anh" nếu khách đã tự xưng trước đó).
+    // Build system prompt from live active skill with customer name
+    let sysPrompt = activeSkillConfig.systemPrompt || `BẠN LÀ CHUYÊN VIÊN TƯ VẤN & CHỐT ĐƠN TOUR DU LỊCH CAO CẤP.
+TÊN KHÁCH HÀNG: {CUSTOMER_NAME}.
 
-🎯 NGUYÊN TẮC BẮT BUỘC:
-1. Vào thẳng vấn đề, TƯ VẤN BÁO GIÁ TOUR / VÉ MÁY BAY NGAY LẬP TỨC.
-2. TUYỆT ĐỐI CẤM TÂM SỰ LAN MAN, CẤM KHEN THỜI TIẾT (Không nói "mùa này đẹp lắm", "thời tiết dịu mát", "rất hợp lý để đi chơi").
-3. LUÔN HỎI THÔNG TIN ĐỂ CHỐT ĐƠN Ở CUỐI CÂU: Hỏi ngày khách đi được, số lượng người đi (người lớn + trẻ em), điểm khởi hành (Hà Nội / TP.HCM).
+🎯 NGUYÊN TẮC CỐT LÕI (BẮT BUỘC TUÂN THỦ 100%):
+1. QUY TẮC BÁM SÁT NGỮ CẢNH & ĐỊA ĐIỂM (TOPIC LOCKING):
+   - Đọc kỹ toàn bộ lịch sử trò chuyện. Nếu khách hàng đã hỏi về ĐÀ NẴNG (hoặc bất kỳ địa điểm nào trước đó), bạn PHẢI TIẾP TỤC TƯ VẤN VỀ ĐÀ NẴNG.
+   - TUYỆT ĐỐI KHÔNG TỰ Ý ĐỔI SANG TOUR KHÁC (như Nha Trang, Phú Quốc...) trừ khi khách hàng chủ động nói muốn đổi địa điểm.
+2. VÀO THẲNG VẤN ĐỀ & BÁO GIÁ TRỌN GÓI:
+   - Nêu rõ giá tiền cụ thể / người và các dịch vụ đã bao gồm (Vé máy bay khứ hồi + Khách sạn + Ăn uống + Vé tham quan).
+3. TUYỆT ĐỐI CẤM TÂM SỰ LAN MAN, CẤM KHEN THỜI TIẾT.
+4. LUÔN HỎI THÔNG TIN ĐỂ CHỐT ĐƠN Ở CUỐI (Ngày đi + Số lượng người).
 
-📚 KHO BẢNG GIÁ TOUR & DỊCH VỤ TRỌN GÓI:
-• Tour Đà Nẵng - Hội An - Bà Nà Hills 3N2Đ: 5.990.000 VNĐ/người (Trọn gói: Vé máy bay khứ hồi + Khách sạn 4 sao gần biển + Vé cáp treo Bà Nà Hills + Ăn uống 3 bữa).
+📚 BẢNG GIÁ TOUR & DỊCH VỤ TRỌN GÓI:
+• Tour Đà Nẵng - Hội An - Bà Nà Hills 3N2Đ: 5.990.000 VNĐ/người (Trọn gói: Vé máy bay khứ hồi + Khách sạn 4 sao gần biển Mỹ Khê + Vé cáp treo Bà Nà + Ăn uống trọn gói).
 • Voucher Combo Phú Quốc 4N3Đ VinWonders: 7.200.000 VNĐ/người (Trọn gói: Vé máy bay khứ hồi + Resort 5 sao buffet sáng + Vé VinWonders & Safari).
 • Tour Du Thuyền Hạ Long 5 Sao 2N1Đ: 3.850.000 VNĐ/người (Trọn gói: Phòng ban công view biển + Đêm tiệc Gala Dinner + Chèo Kayak).
-• Tour Nha Trang 3N2Đ: 4.800.000 VNĐ/người (Trọn gói: Vé máy bay + Khách sạn 4 sao + Tour 3 đảo).
+• Tour Nha Trang 3N2Đ: 4.800.000 VNĐ/người (Trọn gói: Vé máy bay + Khách sạn 4 sao + Tour 3 đảo).`;
 
-📋 CẤU TRÚC CÂU TRẢ LỜI (3 PHẦN):
-1. Chào ngắn gọn 1 câu.
-2. Báo giá chi tiết tour theo đúng địa điểm/thời gian khách hỏi (Giá bao nhiêu / người, đã gồm vé máy bay + khách sạn + ăn uống).
-3. Hỏi ngày khách đi & số lượng người để giữ chỗ: "Anh/chị dự kiến đi vào ngày nào và đoàn mình đi bao nhiêu người để em kiểm tra vé máy bay giờ đẹp và giữ giá ưu đãi tốt nhất cho mình ạ?"`;
+    sysPrompt = sysPrompt.replace(/{CUSTOMER_NAME}/g, contactName);
 
+    try {
       const res = await fetch(`${config.serverUrl}/api/gemini/generate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -486,7 +527,7 @@ XƯNG HÔ: Xưng "Em", gọi khách là "Anh/Chị" (hoặc gọi "Chị", "Anh"
       if (data.candidates && data.candidates[0]?.content?.parts[0]?.text) {
         aiReply = data.candidates[0].content.parts[0].text;
       } else {
-        aiReply = `Dạ em chào anh/chị! Em là nhân viên tư vấn du lịch. Về câu hỏi của anh/chị, em xin gửi thông tin chi tiết lịch trình và giá tour ưu đãi tốt nhất ạ!`;
+        aiReply = `Dạ em chào anh/chị! Em xin gửi thông tin giá tour ưu đãi tốt nhất trọn gói vé máy bay và khách sạn. Anh/chị dự kiến đi vào ngày nào và đoàn mình đi bao nhiêu người để em giữ giá vé tốt nhất ạ?`;
       }
 
       lastGeneratedAnswer = aiReply;
@@ -509,7 +550,7 @@ XƯNG HÔ: Xưng "Em", gọi khách là "Anh/Chị" (hoặc gọi "Chị", "Anh"
     }
   }
 
-  // 9. MULTI-USER QUEUE SCANNER (Scans left sidebar for other incoming chats)
+  // 9. MULTI-USER QUEUE SCANNER
   function scanSidebarForIncomingUsers() {
     const sidebarItems = document.querySelectorAll(
       '#conversationList .conv-item, .chat-item-list .chat-item, div[class*="conv-item"], div[class*="item--contact"]'
@@ -561,7 +602,7 @@ XƯNG HÔ: Xưng "Em", gọi khách là "Anh/Chị" (hoặc gọi "Chị", "Anh"
     }
   }
 
-  // 10. QUEUE WORKER: SEQUENTIALLY SWITCH TO NEXT USER IN QUEUE
+  // 10. QUEUE WORKER
   async function processNextUserInQueue() {
     if (isQueueBusy || processingQueue.length === 0 || !config.autoReply) return;
 
@@ -598,7 +639,7 @@ XƯNG HÔ: Xưng "Em", gọi khách là "Anh/Chị" (hoặc gọi "Chị", "Anh"
     }
   }
 
-  // 11. MAIN HEARTBEAT LOOP (Runs every 1.5s)
+  // 11. MAIN HEARTBEAT LOOP
   function startHeartbeatLoop() {
     setInterval(() => {
       currentActiveContact = getActiveContactName();
@@ -609,7 +650,6 @@ XƯNG HÔ: Xưng "Em", gọi khách là "Anh/Chị" (hoặc gọi "Chị", "Anh"
 
       if (activeBadge) activeBadge.innerText = currentActiveContact;
 
-      // 1. Check active chat unreplied message
       const unrepliedMsg = detectLastIncomingMessageInActiveChat();
       if (unrepliedMsg) {
         if (detectedMsgEl) detectedMsgEl.innerText = `"${unrepliedMsg.substring(0, 30)}..."`;
@@ -623,16 +663,17 @@ XƯNG HÔ: Xưng "Em", gọi khách là "Anh/Chị" (hoặc gọi "Chị", "Anh"
         if (manualBtn) manualBtn.innerText = `⚡ Trả Lời [${currentActiveContact.substring(0, 10)}]`;
       }
 
-      // 2. Scan sidebar for other users (User B, User C)
       scanSidebarForIncomingUsers();
 
-      // 3. If current chat is done and queue has pending users, process next
       if (!unrepliedMsg && processingQueue.length > 0 && !isQueueBusy && config.autoReply) {
         processNextUserInQueue();
       }
 
     }, 1500);
   }
+
+  // Periodically refresh active skill from server
+  setInterval(fetchLiveActiveSkill, 10000);
 
   // Initialize
   setTimeout(() => {

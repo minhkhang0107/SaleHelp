@@ -141,6 +141,10 @@
       <span class="material-symbols-outlined">tune</span>
       <span class="label">Channels</span>
     </div>
+    <div class="nav-item" onclick="switchTab('skills')" id="nav-skills">
+      <span class="material-symbols-outlined">psychology</span>
+      <span class="label">Skills & Prompts</span>
+    </div>
     <div class="nav-item" onclick="switchTab('webhooks')" id="nav-webhooks">
       <span class="material-symbols-outlined">terminal</span>
       <span class="label">Webhooks & Logs</span>
@@ -279,6 +283,79 @@
             <div id="api-log-container" style="flex:1; max-height:420px; overflow-y:auto; background:#18181B; color:#A1A1AA; font-family:'JetBrains Mono', monospace; font-size:11px; padding:12px; border-radius:8px; line-height:1.5;">
               <div style="color:#22C55E;">[READY] Zalo OpenAPI Client & Webhook Engine Initialized.</div>
             </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PAGE 5: SKILLS & SALES PROMPT ENGINEERING STUDIO -->
+    <div class="tab-page" id="page-skills">
+      <div class="settings-page" style="max-width:1160px; margin:0 auto;">
+        <div class="page-header" style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:20px;">
+          <div>
+            <div class="page-title" style="display:flex; align-items:center; gap:8px;">
+              <span class="material-symbols-outlined" style="color:#0284C7; font-size:28px;">psychology</span>
+              AI Skills & Sales Prompt Engineering Studio
+            </div>
+            <div class="page-sub">Quản lý kịch bản chốt sale, tinh chỉnh quy tắc AI trả lời, bám sát địa điểm khách hỏi và đồng bộ tức thì với Chrome Extension.</div>
+          </div>
+          <div style="display:flex; gap:10px;">
+            <button style="padding:10px 16px; background:#0284C7; color:white; border:none; border-radius:8px; font-weight:600; cursor:pointer; display:flex; align-items:center; gap:6px;" onclick="openNewSkillModal()">
+              <span class="material-symbols-outlined" style="font-size:18px;">add_circle</span> + Tạo Skill Mới
+            </button>
+          </div>
+        </div>
+
+        <div style="display:grid; grid-template-columns: 310px 1fr; gap:20px;">
+          <!-- Left: Skills Directory Cards -->
+          <div>
+            <div style="font-size:12px; font-weight:700; color:var(--muted-steel); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:10px;">Danh Sách Kỹ Năng / Kịch Bản</div>
+            <div id="skills-list-container" style="display:flex; flex-direction:column; gap:10px;">
+              <!-- Rendered dynamically -->
+            </div>
+          </div>
+
+          <!-- Right: Skill Editor & Sandbox Playground -->
+          <div style="background:white; border:1px solid var(--whisper-border); border-radius:12px; padding:20px; box-shadow:0 4px 14px rgba(0,0,0,0.03);">
+            <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:16px; padding-bottom:14px; border-bottom:1px solid #F1F5F9;">
+              <div>
+                <span id="editor-skill-category" style="background:rgba(2,132,199,0.1); color:#0284C7; font-size:11px; font-weight:700; padding:3px 8px; border-radius:6px;">Category</span>
+                <h3 id="editor-skill-name" style="font-size:17px; font-weight:700; margin:6px 0 2px 0; color:#0F172A;">Tên Kỹ Năng</h3>
+                <div id="editor-skill-desc" style="font-size:12px; color:#64748B;">Mô tả kịch bản</div>
+              </div>
+              <div style="display:flex; gap:8px;">
+                <button id="btn-activate-skill" style="padding:8px 14px; background:#10B981; color:white; border:none; border-radius:8px; font-size:12px; font-weight:700; cursor:pointer;" onclick="toggleCurrentSkillActive()">
+                  ⭐ Đang Kích Hoạt (Active)
+                </button>
+                <button style="padding:8px 16px; background:#0284C7; color:white; border:none; border-radius:8px; font-size:12px; font-weight:700; cursor:pointer; display:flex; align-items:center; gap:6px;" onclick="saveCurrentSkillEdits()">
+                  <span class="material-symbols-outlined" style="font-size:16px;">save</span> Lưu Thay Đổi
+                </button>
+              </div>
+            </div>
+
+            <!-- Skill Prompt Textarea -->
+            <div class="form-group" style="margin-bottom:16px;">
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+                <label style="font-weight:700; font-size:12.5px; color:#1E293B;">Kịch bản Hướng dẫn Hệ thống (System Prompt / Rules & Knowledge):</label>
+                <span style="font-size:11px; color:#0284C7; font-weight:600;">Dùng {CUSTOMER_NAME} để tự chèn tên khách</span>
+              </div>
+              <textarea id="editor-skill-prompt" rows="13" style="width:100%; font-family:'JetBrains Mono', monospace; font-size:12.5px; line-height:1.45; padding:12px; border:1px solid #CBD5E1; border-radius:8px; outline:none;"></textarea>
+            </div>
+
+            <!-- Live Test Sandbox -->
+            <div style="background:#F8FAFC; border:1px solid #E2E8F0; border-radius:10px; padding:14px;">
+              <div style="font-weight:700; font-size:12.5px; color:#0284C7; margin-bottom:8px; display:flex; align-items:center; gap:6px;">
+                <span class="material-symbols-outlined" style="font-size:18px;">science</span> Test Thử Nghiệm Kịch Bản Trực Tiếp (Live Sandbox)
+              </div>
+              <div style="display:flex; gap:8px;">
+                <input type="text" id="skill-test-input" placeholder="Nhập câu hỏi test (VD: Chị muốn đi Đà Nẵng tháng 10 có giá nào tốt?)..." style="flex:1; padding:9px 12px; border:1px solid #CBD5E1; border-radius:8px; font-size:12.5px;">
+                <button style="padding:9px 16px; background:#2563EB; color:white; border:none; border-radius:8px; font-weight:700; font-size:12.5px; cursor:pointer;" onclick="runSkillTest()">
+                  🚀 Chạy Test
+                </button>
+              </div>
+              <div id="skill-test-output" style="margin-top:10px; padding:12px; background:white; border:1px solid #CBD5E1; border-radius:8px; font-size:12.5px; line-height:1.5; color:#1E293B; display:none;"></div>
+            </div>
+
           </div>
         </div>
       </div>
@@ -725,6 +802,7 @@
       renderChannels();
       renderChatDashboard();
       updateWebhookPayloadTemplate();
+      loadSkillsData();
       startTokenRefreshScheduler();
       initRealtimeWebhookListener();
       logApiTraffic('INFO', 'SaleHelp Real Multi-Channel Proxy Connected', {
@@ -2181,6 +2259,188 @@ TÊN KHÁCH HÀNG: "${conv.name}".
       renderTours();
       closeModal('modal-add-tour');
       alert('Đã thêm tour mới thành công! RAG Search hiện đã nhận thông tin tour mới.');
+    }
+
+    // 16. SKILLS & SALES PROMPT ENGINEERING HANDLERS
+    let skillsState = {
+      activeSkillId: 'tour_closing_pro',
+      skills: []
+    };
+    let currentSelectedSkillId = 'tour_closing_pro';
+
+    async function loadSkillsData() {
+      try {
+        const res = await fetch('/api/skills');
+        if (res.ok) {
+          skillsState = await res.json();
+          renderSkillsList();
+          selectSkillToEdit(skillsState.activeSkillId || (skillsState.skills[0] && skillsState.skills[0].id));
+        }
+      } catch (e) {
+        console.warn('Lỗi tải danh sách skills:', e);
+      }
+    }
+
+    function renderSkillsList() {
+      const container = document.getElementById('skills-list-container');
+      if (!container) return;
+      container.innerHTML = '';
+
+      if (!skillsState.skills || skillsState.skills.length === 0) {
+        container.innerHTML = '<div style="color:var(--muted-steel); font-size:12px;">Chưa có skill nào.</div>';
+        return;
+      }
+
+      skillsState.skills.forEach(s => {
+        const isActive = s.id === skillsState.activeSkillId;
+        const isSelected = s.id === currentSelectedSkillId;
+
+        const card = document.createElement('div');
+        card.style.cssText = `
+          padding: 12px 14px;
+          border-radius: 10px;
+          border: 1.5px solid ${isSelected ? '#0284C7' : 'var(--whisper-border)'};
+          background: ${isSelected ? 'rgba(2,132,199,0.04)' : 'white'};
+          cursor: pointer;
+          transition: all 0.15s ease;
+        `;
+        card.onclick = () => selectSkillToEdit(s.id);
+        card.innerHTML = `
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+            <span style="font-size:11px; font-weight:700; color:#0284C7; background:rgba(2,132,199,0.1); padding:2px 6px; border-radius:4px;">${s.category || 'General'}</span>
+            ${isActive ? '<span style="font-size:10.5px; font-weight:700; color:#10B981; background:rgba(16,185,129,0.1); padding:2px 6px; border-radius:4px;">⭐ Đang Dùng</span>' : ''}
+          </div>
+          <div style="font-size:13.5px; font-weight:700; color:#0F172A; margin-bottom:2px;">${s.name}</div>
+          <div style="font-size:11.5px; color:#64748B; line-height:1.35;">${s.description || ''}</div>
+        `;
+        container.appendChild(card);
+      });
+    }
+
+    function selectSkillToEdit(skillId) {
+      currentSelectedSkillId = skillId;
+      const skill = skillsState.skills.find(s => s.id === skillId) || skillsState.skills[0];
+      if (!skill) return;
+
+      const catEl = document.getElementById('editor-skill-category');
+      const nameEl = document.getElementById('editor-skill-name');
+      const descEl = document.getElementById('editor-skill-desc');
+      const promptEl = document.getElementById('editor-skill-prompt');
+      const btnActive = document.getElementById('btn-activate-skill');
+
+      if (catEl) catEl.innerText = skill.category || 'General';
+      if (nameEl) nameEl.innerText = skill.name;
+      if (descEl) descEl.innerText = skill.description;
+      if (promptEl) promptEl.value = skill.systemPrompt || '';
+
+      const isActive = skill.id === skillsState.activeSkillId;
+      if (btnActive) {
+        if (isActive) {
+          btnActive.style.background = '#10B981';
+          btnActive.innerHTML = '⭐ Đang Kích Hoạt (Active)';
+        } else {
+          btnActive.style.background = '#64748B';
+          btnActive.innerHTML = '⚡ Chọn Làm Skill Chính';
+        }
+      }
+
+      renderSkillsList();
+    }
+
+    async function saveCurrentSkillEdits() {
+      const skill = skillsState.skills.find(s => s.id === currentSelectedSkillId);
+      if (!skill) return;
+
+      const promptVal = document.getElementById('editor-skill-prompt').value;
+      skill.systemPrompt = promptVal;
+
+      try {
+        const res = await fetch('/api/skills/save', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(skillsState)
+        });
+        if (res.ok) {
+          alert('💾 ĐÃ LƯU SKILL THÀNH CÔNG!\n\nKịch bản mới đã được lưu và cập nhật tức thì cho Chrome Extension và AI Live Chat.');
+          logApiTraffic('SKILL_SAVED', 'POST /api/skills/save', { skillId: skill.id, skillName: skill.name });
+        }
+      } catch (e) {
+        alert('Lỗi lưu skill: ' + e.message);
+      }
+    }
+
+    async function toggleCurrentSkillActive() {
+      try {
+        const res = await fetch('/api/skills/set-active', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ skillId: currentSelectedSkillId })
+        });
+        if (res.ok) {
+          skillsState.activeSkillId = currentSelectedSkillId;
+          renderSkillsList();
+          selectSkillToEdit(currentSelectedSkillId);
+          alert('⭐ ĐÃ KÍCH HOẠT SKILL NÀY!\n\nChrome Extension và Dashboard hiện đang áp dụng kỹ năng: ' + currentSelectedSkillId);
+        }
+      } catch (e) {
+        alert('Lỗi kích hoạt skill: ' + e.message);
+      }
+    }
+
+    async function runSkillTest() {
+      const input = document.getElementById('skill-test-input').value.trim();
+      const prompt = document.getElementById('editor-skill-prompt').value;
+      const outputEl = document.getElementById('skill-test-output');
+
+      if (!input) {
+        alert('Vui lòng nhập câu hỏi khách hàng để test!');
+        return;
+      }
+
+      if (outputEl) {
+        outputEl.style.display = 'block';
+        outputEl.innerHTML = '<span style="color:#0284C7;">⏳ Gemini 3.6 Flash đang xử lý theo kịch bản này...</span>';
+      }
+
+      try {
+        const res = await fetch('/api/gemini/generate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            prompt: input,
+            systemInstruction: prompt.replace('{CUSTOMER_NAME}', 'Chị Lan (Test Sandbox)'),
+            model: 'gemini-3.6-flash'
+          })
+        });
+        const data = await res.json();
+        if (data.candidates && data.candidates[0]?.content?.parts[0]?.text) {
+          const aiText = data.candidates[0].content.parts[0].text;
+          outputEl.innerHTML = `
+            <div style="font-weight:700; color:#10B981; margin-bottom:4px;">✅ KẾT QUẢ PHẢN HỒI THỬ NGHIỆM:</div>
+            <div style="white-space:pre-wrap;">${aiText}</div>
+          `;
+        } else {
+          outputEl.innerHTML = '<span style="color:#EF4444;">❌ Không nhận được câu trả lời từ AI.</span>';
+        }
+      } catch (e) {
+        outputEl.innerHTML = '<span style="color:#EF4444;">❌ Lỗi: ' + e.message + '</span>';
+      }
+    }
+
+    function openNewSkillModal() {
+      const name = prompt('Nhập tên Kỹ năng / Kịch bản mới:');
+      if (!name) return;
+      const newSkill = {
+        id: 'skill_' + Date.now(),
+        name: name,
+        category: 'Custom',
+        description: 'Kịch bản tùy chỉnh của người dùng',
+        systemPrompt: document.getElementById('editor-skill-prompt').value
+      };
+      skillsState.skills.push(newSkill);
+      saveCurrentSkillEdits();
+      renderSkillsList();
+      selectSkillToEdit(newSkill.id);
     }
 
     window.onload = initPage;
