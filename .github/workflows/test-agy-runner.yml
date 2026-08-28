@@ -1,0 +1,47 @@
+name: Test AGY Runner
+
+on:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: [self-hosted, linux, ai-engineer]
+
+    steps:
+      - name: Checkout develop
+        uses: actions/checkout@v4
+        with:
+          ref: develop
+
+      - name: Environment
+        run: |
+          echo "USER=$(whoami)"
+          echo "WORKSPACE=$GITHUB_WORKSPACE"
+          pwd
+          git status
+          agy --version
+
+      - name: Test AGY
+        run: |
+          mkdir -p "$GITHUB_WORKSPACE/.ai-test"
+
+          agy -p "
+          You are testing a CI workspace.
+
+          Repository:
+          $GITHUB_WORKSPACE
+
+          Rules:
+          - Work only inside this repository.
+          - Do not use scratch directories.
+          - Create .ai-test/AGY_OK.txt containing exactly AGY_OK.
+          - Run git status.
+          - Report the repository root.
+          " \
+            --add-dir "$GITHUB_WORKSPACE" \
+            --output-format json
+
+      - name: Verify
+        run: |
+          test "$(cat "$GITHUB_WORKSPACE/.ai-test/AGY_OK.txt")" = "AGY_OK"
+          git status --short
