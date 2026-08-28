@@ -2,13 +2,9 @@ name: AI Engineering Team
 
 on:
   issues:
-    types: [labeled]
+    types:
+      - labeled
   workflow_dispatch:
-    inputs:
-      issue_number:
-        description: Issue number to test
-        required: true
-        type: string
 
 permissions:
   contents: write
@@ -21,16 +17,11 @@ jobs:
       github.event_name == 'workflow_dispatch' ||
       (
         github.event_name == 'issues' &&
-        github.event.action == 'labeled' &&
         github.event.label.name == 'ai:auto' &&
-        github.event.issue.state == 'open' &&
-        github.event.issue.user.login == 'minhkhang0107'
+        github.event.issue.state == 'open'
       )
     runs-on: [self-hosted, Linux, ai-engineer]
     timeout-minutes: 120
-
-    env:
-      ISSUE_NUMBER: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.issue_number || github.event.issue.number }}
 
     steps:
       - name: Checkout develop
@@ -47,7 +38,6 @@ jobs:
           echo "user=$(whoami)"
           echo "home=$HOME"
           echo "workspace=$GITHUB_WORKSPACE"
-          echo "issue=$ISSUE_NUMBER"
           command -v agy
           agy --version
           git status --short
@@ -58,7 +48,7 @@ jobs:
           set -euo pipefail
           rm -rf .ai-test
           mkdir -p .ai-test
-          agy -p "Create exactly .ai-test/AGY_OK.txt in the current workspace with content AGY_OK. Do not use scratch directories." \
+          agy -p "Create exactly this file in the current workspace: .ai-test/AGY_OK.txt. Its content must be exactly AGY_OK. Do not use a scratch directory." \
             --add-dir "$GITHUB_WORKSPACE" \
             --output-format json
           test -f .ai-test/AGY_OK.txt
@@ -71,11 +61,4 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          gh issue comment "$ISSUE_NUMBER" \
-            --body "✅ AI Engineering Team entrypoint passed. Self-hosted runner connected and AGY successfully edited the develop checkout workspace."
-
-      - name: Manual dispatch result
-        if: github.event_name == 'workflow_dispatch'
-        shell: bash
-        run: |
-          echo "Manual AGY entrypoint smoke test passed for Issue #$ISSUE_NUMBER."
+          gh issue comment "$GITHUB_EVENT_ISSUE_NUMBER" --body "✅ AI Engineering Team entrypoint is working on the self-hosted runner. AGY successfully edited the repository workspace."
