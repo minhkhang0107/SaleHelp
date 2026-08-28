@@ -1,0 +1,20 @@
+name: AI Entrypoint Smoke Test
+
+on:
+  workflow_dispatch:
+
+jobs:
+  smoke-test:
+    runs-on: [self-hosted, linux, ai-engineer]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: develop
+          persist-credentials: false
+      - name: Verify AGY can edit workspace
+        run: |
+          set -euo pipefail
+          rm -rf .ai-test
+          mkdir -p .ai-test
+          agy -p "Create .ai-test/ENTRYPOINT_OK.txt containing exactly ENTRYPOINT_OK. Do not use scratch directories." --add-dir "$GITHUB_WORKSPACE" --output-format json
+          test "$(cat .ai-test/ENTRYPOINT_OK.txt)" = "ENTRYPOINT_OK"
