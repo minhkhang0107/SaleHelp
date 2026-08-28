@@ -1,0 +1,183 @@
+name: AI Engineering Team
+
+on:
+  issues:
+    types: [labeled]
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+
+concurrency:
+  group: ai-issue-${{ github.event.issue.number }}
+  cancel-in-progress: false
+
+jobs:
+  ai-engineer:
+    # Run this on a trusted self-hosted runner where `agy` is authenticated.
+    # Do NOT run an autonomous coding agent on an untrusted public runner.
+    if: github.event.label.name == 'ai:auto' && github.event.issue.state == 'open'
+    runs-on: [self-hosted, linux, ai-engineer]
+    timeout-minutes: 120
+    env:
+      ISSUE_NUMBER: ${{ github.event.issue.number }}
+      ISSUE_TITLE: ${{ github.event.issue.title }}
+      ISSUE_BODY: ${{ github.event.issue.body }}
+      GH_TOKEN: ${{ github.token }}
+      BASE_BRANCH: develop
+      MAX_REVIEW_FIX_CYCLES: 3
+
+    steps:
+      - name: Checkout develop
+        uses: actions/checkout@v4
+        with:
+          ref: develop
+          fetch-depth: 0
+
+      - name: Configure git
+        run: |
+          git config user.name "salehelp-ai"
+          git config user.email "salehelp-ai@users.noreply.github.com"
+
+      - name: Verify Antigravity CLI
+        run: |
+          command -v agy
+          agy --help >/dev/null
+          agy agents
+
+      - name: Create issue workspace
+        shell: bash
+        run: |
+          set -euo pipefail
+          BRANCH="ai/issue-${ISSUE_NUMBER}"
+          git fetch origin develop
+          if git ls-remote --exit-code --heads origin "$BRANCH" >/dev/null 2>&1; then
+            echo "Branch $BRANCH already exists. Refusing to overwrite an existing AI run."
+            exit 1
+          fi
+          git switch -c "$BRANCH" origin/develop
+          mkdir -p ".ai/runs/${ISSUE_NUMBER}"
+          cat > ".ai/runs/${ISSUE_NUMBER}/issue.md" <<EOF
+# GitHub Issue #${ISSUE_NUMBER}
+
+## Title
+${ISSUE_TITLE}
+
+## Body
+${ISSUE_BODY}
+EOF
+          cat > ".ai/runs/${ISSUE_NUMBER}/state.md" <<EOF
+# AI Run State
+
+Issue: #${ISSUE_NUMBER}
+Base: ${BASE_BRANCH}
+Branch: ${BRANCH}
+Stage: planner
+Review cycles: 0
+EOF
+          git add ".ai/runs/${ISSUE_NUMBER}"
+          git commit -m "chore(ai): initialize issue #${ISSUE_NUMBER} run"
+
+      - name: Comment — started
+        run: |
+          gh issue comment "$ISSUE_NUMBER" --body "🤖 **AI Engineering Team started**\n\nPipeline: Planner → Developer → Reviewer → Tester → Fix loop → PR\n\nTarget branch: \`develop\`"
+
+      - name: Planner
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p ".ai/runs/${ISSUE_NUMBER}"
+          agy -p "You are the Planner for GitHub Issue #${ISSUE_NUMBER}.\n\nRead .ai/runs/${ISSUE_NUMBER}/issue.md, AGENTS.md, LOOP.md, STATE.md, relevant docs and source code.\n\nDo NOT modify application source code. Create .ai/runs/${ISSUE_NUMBER}/plan.md containing:\n- problem statement\n- requirements\n- affected modules/files\n- architecture considerations\n- atomic implementation tasks\n- acceptance criteria\n- tests\n- risks and ambiguities\n\nBreak large work into small slices. If requirements are contradictory, clearly mark BLOCKED. Do not implement code." --agent planner --output-format json --print-timeout 20m > ".ai/runs/${ISSUE_NUMBER}/planner-result.json"
+          jq -r '.response' ".ai/runs/${ISSUE_NUMBER}/planner-result.json" > ".ai/runs/${ISSUE_NUMBER}/planner-response.md"
+          test -s ".ai/runs/${ISSUE_NUMBER}/plan.md" || cp ".ai/runs/${ISSUE_NUMBER}/planner-response.md" ".ai/runs/${ISSUE_NUMBER}/plan.md"
+          if grep -q 'BLOCKED' ".ai/runs/${ISSUE_NUMBER}/plan.md"; then
+            echo "Planner marked the issue BLOCKED."
+            exit 1
+          fi
+          git add ".ai/runs/${ISSUE_NUMBER}"
+          git commit -m "chore(ai): add plan for issue #${ISSUE_NUMBER}"
+
+      - name: Comment — plan ready
+        run: |
+          gh issue comment "$ISSUE_NUMBER" --body "🧠 **Planner completed**\n\nPlan saved in \`.ai/runs/${ISSUE_NUMBER}/plan.md\`. Starting implementation."
+
+      - name: Developer
+        shell: bash
+        run: |
+          set -euo pipefail
+          agy -p "You are the Developer for GitHub Issue #${ISSUE_NUMBER}.\n\nRead:\n- .ai/runs/${ISSUE_NUMBER}/issue.md\n- .ai/runs/${ISSUE_NUMBER}/plan.md\n- AGENTS.md\n- relevant repository docs and source code\n\nImplement the approved plan completely, but only within the issue scope. Follow existing architecture. Run appropriate tests and lint. Do not modify unrelated files. Do not create or expose secrets.\n\nWhen done, write .ai/runs/${ISSUE_NUMBER}/developer-result.md with files changed, commands run, test results, and remaining risks. If blocked by ambiguity, write BLOCKED and stop." --agent implementer --dangerously-skip-permissions --output-format json --print-timeout 45m > ".ai/runs/${ISSUE_NUMBER}/developer-result.json"
+          jq -r '.response' ".ai/runs/${ISSUE_NUMBER}/developer-result.json" > ".ai/runs/${ISSUE_NUMBER}/developer-response.md"
+          git status --short
+
+      - name: Reviewer
+        id: reviewer
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff origin/develop...HEAD > ".ai/runs/${ISSUE_NUMBER}/changes.diff"
+          agy -p "You are the independent Reviewer for GitHub Issue #${ISSUE_NUMBER}.\n\nRead .ai/runs/${ISSUE_NUMBER}/issue.md, .ai/runs/${ISSUE_NUMBER}/plan.md, AGENTS.md and .ai/runs/${ISSUE_NUMBER}/changes.diff. Inspect the actual changed files.\n\nDo NOT modify source code. Review correctness, requirements, architecture, security, performance, regressions, and tests.\n\nWrite .ai/runs/${ISSUE_NUMBER}/review.md. It MUST contain exactly one line starting with 'VERDICT: PASS' or 'VERDICT: FAIL'. List every finding with severity CRITICAL/HIGH/MEDIUM/LOW and file/line plus a concrete fix recommendation. CRITICAL/HIGH means FAIL." --agent issue-reviewer --output-format json --print-timeout 30m > ".ai/runs/${ISSUE_NUMBER}/reviewer-result.json"
+          jq -r '.response' ".ai/runs/${ISSUE_NUMBER}/reviewer-result.json" > ".ai/runs/${ISSUE_NUMBER}/reviewer-response.md"
+          test -s ".ai/runs/${ISSUE_NUMBER}/review.md" || cp ".ai/runs/${ISSUE_NUMBER}/reviewer-response.md" ".ai/runs/${ISSUE_NUMBER}/review.md"
+          if grep -q '^VERDICT: PASS' ".ai/runs/${ISSUE_NUMBER}/review.md"; then
+            echo "REVIEW_PASS=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "REVIEW_PASS=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Fix and re-review
+        if: steps.reviewer.outputs.REVIEW_PASS == 'false'
+        shell: bash
+        run: |
+          set -euo pipefail
+          for cycle in $(seq 1 "$MAX_REVIEW_FIX_CYCLES"); do
+            echo "Review/fix cycle $cycle"
+            agy -p "You are the Developer/Fixer for GitHub Issue #${ISSUE_NUMBER}.\n\nRead .ai/runs/${ISSUE_NUMBER}/issue.md, .ai/runs/${ISSUE_NUMBER}/plan.md, .ai/runs/${ISSUE_NUMBER}/review.md and the actual git diff.\n\nFix every CRITICAL and HIGH issue and every valid MEDIUM issue from the review. Do not change unrelated scope. Run relevant tests after fixing. Update .ai/runs/${ISSUE_NUMBER}/developer-result.md.\n\nDo not merely describe fixes: make the changes in the repository." --agent implementer --dangerously-skip-permissions --output-format json --print-timeout 45m > ".ai/runs/${ISSUE_NUMBER}/fix-${cycle}.json"
+
+            git diff origin/develop...HEAD > ".ai/runs/${ISSUE_NUMBER}/changes.diff"
+            agy -p "You are the independent Reviewer for GitHub Issue #${ISSUE_NUMBER}. Read .ai/runs/${ISSUE_NUMBER}/issue.md, .ai/runs/${ISSUE_NUMBER}/plan.md, .ai/runs/${ISSUE_NUMBER}/changes.diff and the actual changed files. Do NOT modify code. Rewrite .ai/runs/${ISSUE_NUMBER}/review.md with one mandatory first-line verdict: 'VERDICT: PASS' or 'VERDICT: FAIL'. CRITICAL/HIGH findings require FAIL." --agent issue-reviewer --output-format json --print-timeout 30m > ".ai/runs/${ISSUE_NUMBER}/review-${cycle}.json"
+            jq -r '.response' ".ai/runs/${ISSUE_NUMBER}/review-${cycle}.json" > ".ai/runs/${ISSUE_NUMBER}/reviewer-response-${cycle}.md"
+            if grep -q '^VERDICT: PASS' ".ai/runs/${ISSUE_NUMBER}/review.md"; then
+              break
+            fi
+            if [ "$cycle" = "$MAX_REVIEW_FIX_CYCLES" ]; then
+              echo "Review did not pass after $MAX_REVIEW_FIX_CYCLES cycles."
+              exit 1
+            fi
+          done
+
+      - name: Tester
+        shell: bash
+        run: |
+          set -euo pipefail
+          agy -p "You are the independent Test Engineer for GitHub Issue #${ISSUE_NUMBER}.\n\nRead .ai/runs/${ISSUE_NUMBER}/issue.md, .ai/runs/${ISSUE_NUMBER}/plan.md, AGENTS.md and the changed source. Run the project's actual verification commands. For this repository start with npm test and npm run lint when applicable. Add targeted tests based on the changed area. Do NOT modify application source code.\n\nWrite .ai/runs/${ISSUE_NUMBER}/test.md with exactly one first-line verdict: 'VERDICT: PASS' or 'VERDICT: FAIL', followed by commands, results, failures, regressions, and missing tests." --agent issue-tester --output-format json --print-timeout 45m > ".ai/runs/${ISSUE_NUMBER}/tester-result.json"
+          jq -r '.response' ".ai/runs/${ISSUE_NUMBER}/tester-result.json" > ".ai/runs/${ISSUE_NUMBER}/tester-response.md"
+          test -s ".ai/runs/${ISSUE_NUMBER}/test.md" || cp ".ai/runs/${ISSUE_NUMBER}/tester-response.md" ".ai/runs/${ISSUE_NUMBER}/test.md"
+          grep -q '^VERDICT: PASS' ".ai/runs/${ISSUE_NUMBER}/test.md"
+
+      - name: Commit implementation and open PR
+        shell: bash
+        run: |
+          set -euo pipefail
+          BRANCH="ai/issue-${ISSUE_NUMBER}"
+          cat > ".ai/runs/${ISSUE_NUMBER}/state.md" <<EOF
+# AI Run State
+
+Issue: #${ISSUE_NUMBER}
+Branch: ${BRANCH}
+Status: READY_FOR_HUMAN_REVIEW
+Review: PASS
+Tests: PASS
+EOF
+          git add -A
+          git commit -m "feat: implement issue #${ISSUE_NUMBER}" || true
+          git push origin "$BRANCH"
+          gh pr create \
+            --base develop \
+            --head "$BRANCH" \
+            --title "AI: #${ISSUE_NUMBER} — ${ISSUE_TITLE}" \
+            --body "## AI Engineering Team\n\nCloses #${ISSUE_NUMBER}\n\n### Pipeline\n- 🧠 Planner: complete\n- 👨‍💻 Developer: complete\n- 🔍 Reviewer: PASS\n- 🧪 Tester: PASS\n\n### Artifacts\n- \`.ai/runs/${ISSUE_NUMBER}/plan.md\`\n- \`.ai/runs/${ISSUE_NUMBER}/review.md\`\n- \`.ai/runs/${ISSUE_NUMBER}/test.md\`\n\n**Human merge required.**"
+
+      - name: Comment — PR ready
+        run: |
+          gh issue comment "$ISSUE_NUMBER" --body "✅ **AI Engineering Team completed**\n\nPlanner → Developer → Reviewer → Tester all passed.\n\nA PR targeting \`develop\` has been created. **Human merge is required.**"
