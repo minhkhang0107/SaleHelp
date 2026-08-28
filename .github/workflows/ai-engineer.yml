@@ -23,8 +23,7 @@ jobs:
         github.event_name == 'issues' &&
         github.event.action == 'labeled' &&
         github.event.label.name == 'ai:auto' &&
-        github.event.issue.state == 'open' &&
-        github.event.issue.user.login == 'minhkhang0107'
+        github.event.issue.state == 'open'
       )
     runs-on: [self-hosted, Linux, ai-engineer]
     timeout-minutes: 120
