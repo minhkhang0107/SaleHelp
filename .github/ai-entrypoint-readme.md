@@ -1,0 +1,1 @@
+The AI Engineering Team workflow is installed on the repository default branch so `issues:labeled` events can trigger it. The workflow checks out `develop` for implementation and creates AI branches targeting `develop`.
