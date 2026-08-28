@@ -5,7 +5,7 @@ on:
 
 jobs:
   test:
-    runs-on: [self-hosted, linux, ai-engineer]
+    runs-on: [self-hosted, linux, AI-Runner]
 
     steps:
       - name: Checkout develop
