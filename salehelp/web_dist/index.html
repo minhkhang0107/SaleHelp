@@ -149,6 +149,10 @@
       <span class="material-symbols-outlined">terminal</span>
       <span class="label">Webhooks & Logs</span>
     </div>
+    <div class="nav-item" onclick="switchTab('settings')" id="nav-settings">
+      <span class="material-symbols-outlined">settings</span>
+      <span class="label">Settings</span>
+    </div>
   </div>
 
   <div class="main-content">
@@ -289,6 +293,41 @@
     </div>
 
     <!-- PAGE 5: SKILLS & SALES PROMPT ENGINEERING STUDIO -->
+    <!-- PAGE: SETTINGS (Gemini API key) -->
+    <div class="tab-page" id="page-settings">
+      <div class="settings-page">
+        <div class="page-header">
+          <div class="page-title">Settings</div>
+          <div class="page-sub">Cấu hình Gemini API key. Key được lưu trên máy chạy server (file <code>settings.local.json</code>, không đưa lên git) và dùng cho mọi yêu cầu AI, kể cả extension Zalo.</div>
+        </div>
+
+        <div class="card" style="max-width:640px;">
+          <div style="display:flex; align-items:center; gap:8px; font-size:16px; font-weight:700; margin-bottom:12px;">
+            <span class="material-symbols-outlined" style="color:var(--sapphire-accent);">key</span>
+            Gemini API Key
+          </div>
+
+          <div id="settings-key-status" style="font-size:13px; margin-bottom:14px; padding:8px 12px; border-radius:8px; background:#F1F5F9;">Đang kiểm tra...</div>
+
+          <div class="form-group" style="margin-bottom:12px;">
+            <label for="settings-gemini-key">API key mới</label>
+            <div style="display:flex; gap:8px;">
+              <input type="password" id="settings-gemini-key" autocomplete="off" spellcheck="false" placeholder="Dán Gemini API key vào đây" style="flex:1;">
+              <button type="button" id="settings-toggle-btn" style="padding:0 14px; background:var(--pure-surface); border:1px solid var(--whisper-border); border-radius:8px; cursor:pointer;" onclick="toggleSettingsKeyVisibility()">Hiện</button>
+            </div>
+            <div style="font-size:12px; color:#64748B; margin-top:6px;">Lấy key tại <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey</a>. Key được kiểm tra với Google trước khi lưu và không bao giờ được gửi ngược lại trình duyệt (chỉ hiện 4 ký tự cuối).</div>
+          </div>
+
+          <div id="settings-message" style="font-size:13px; font-weight:600; min-height:20px; margin-bottom:10px;"></div>
+
+          <div style="display:flex; gap:8px; justify-content:flex-end;">
+            <button type="button" id="settings-clear-btn" style="padding:10px 16px; background:var(--pure-surface); border:1px solid var(--whisper-border); color:#B91C1C; border-radius:8px; font-weight:600; cursor:pointer;" onclick="clearGeminiKey()">Xóa key</button>
+            <button type="button" id="settings-save-btn" style="padding:10px 20px; background:var(--sapphire-accent); color:white; border:none; border-radius:8px; font-weight:600; cursor:pointer;" onclick="saveGeminiKey()">Lưu & kiểm tra</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <div class="tab-page" id="page-skills">
       <div class="settings-page" style="max-width:1160px; margin:0 auto;">
         <div class="page-header" style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:20px;">
@@ -908,6 +947,90 @@
       }
     }
 
+    // SETTINGS: Gemini API key (server keeps the full key; browser only ever sees the masked preview)
+    async function loadSettingsStatus() {
+      const el = document.getElementById('settings-key-status');
+      if (!el) return;
+      try {
+        const res = await fetch('/api/settings', { cache: 'no-store' });
+        const data = await res.json();
+        const sourceLabel = { dashboard: 'nhập từ Dashboard', env: 'từ file .env', none: '' }[data.geminiKeySource] || '';
+        if (data.geminiKeyConfigured) {
+          el.style.background = '#DCFCE7';
+          el.style.color = '#166534';
+          el.textContent = `✅ Đã cấu hình key ${data.geminiKeyPreview} (${sourceLabel})`;
+        } else {
+          el.style.background = '#FEE2E2';
+          el.style.color = '#991B1B';
+          el.textContent = '⚠️ Chưa có API key. AI chưa thể trả lời, hãy nhập key bên dưới.';
+        }
+      } catch (e) {
+        el.style.background = '#FEE2E2';
+        el.style.color = '#991B1B';
+        el.textContent = '❌ Không kết nối được server.';
+      }
+    }
+
+    function setSettingsMessage(text, ok) {
+      const msg = document.getElementById('settings-message');
+      msg.textContent = text;
+      msg.style.color = ok ? '#166534' : '#991B1B';
+    }
+
+    async function postGeminiKey(value, busyLabel) {
+      const saveBtn = document.getElementById('settings-save-btn');
+      saveBtn.disabled = true;
+      const oldLabel = saveBtn.textContent;
+      saveBtn.textContent = busyLabel;
+      try {
+        const res = await fetch('/api/settings/save', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ geminiApiKey: value })
+        });
+        return await res.json();
+      } catch (e) {
+        return { ok: false, error: 'Không kết nối được server.' };
+      } finally {
+        saveBtn.disabled = false;
+        saveBtn.textContent = oldLabel;
+      }
+    }
+
+    async function saveGeminiKey() {
+      const input = document.getElementById('settings-gemini-key');
+      const value = input.value.trim();
+      if (!value) {
+        setSettingsMessage('Hãy dán API key trước khi lưu.', false);
+        return;
+      }
+      setSettingsMessage('Đang kiểm tra key với Google...', true);
+      const data = await postGeminiKey(value, 'Đang kiểm tra...');
+      if (data.ok) {
+        input.value = '';
+        setSettingsMessage(data.warning || '✅ Đã lưu và xác nhận key hợp lệ.', true);
+      } else {
+        setSettingsMessage('❌ ' + (data.error || 'Lưu thất bại'), false);
+      }
+      loadSettingsStatus();
+    }
+
+    async function clearGeminiKey() {
+      if (!confirm('Xóa API key đã lưu từ Dashboard? AI sẽ ngừng hoạt động nếu không còn key nào khác.')) return;
+      const data = await postGeminiKey('', 'Đang xóa...');
+      setSettingsMessage(data.ok ? 'Đã xóa key lưu từ Dashboard.' : '❌ ' + (data.error || 'Xóa thất bại'), Boolean(data.ok));
+      document.getElementById('settings-gemini-key').value = '';
+      loadSettingsStatus();
+    }
+
+    function toggleSettingsKeyVisibility() {
+      const input = document.getElementById('settings-gemini-key');
+      const btn = document.getElementById('settings-toggle-btn');
+      const show = input.type === 'password';
+      input.type = show ? 'text' : 'password';
+      btn.textContent = show ? 'Ẩn' : 'Hiện';
+    }
+
     function switchTab(tab) {
       document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
       document.querySelectorAll('.tab-page').forEach(el => el.classList.remove('active'));
@@ -916,6 +1039,7 @@
       const pageEl = document.getElementById('page-' + tab);
       if (navEl) navEl.classList.add('active');
       if (pageEl) pageEl.classList.add('active');
+      if (tab === 'settings') loadSettingsStatus();
     }
 
     // 7. ZALO OAUTH 2.0 PKCE ENGINE WITH SCOPES & STATE

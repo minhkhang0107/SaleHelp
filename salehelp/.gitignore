@@ -60,3 +60,6 @@ data/lib/src/repository/model/generated
 .env.local
 .env.*.local
 *.env
+
+# Local secrets entered via the Dashboard (Gemini API key)
+settings.local.json

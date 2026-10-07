@@ -11,17 +11,60 @@ const crypto = require('crypto');
 const PORT = 8080;
 const STATIC_DIR = path.join(__dirname, 'web_dist');
 
-// Read .env or .env.example
-let GEMINI_API_KEY = '';
-const envPath = path.join(__dirname, '.env');
-const envExamplePath = path.join(__dirname, '.env.example');
-const targetEnv = fs.existsSync(envPath) ? envPath : (fs.existsSync(envExamplePath) ? envExamplePath : null);
+// ------------------------------------------------------------------------------
+// GEMINI API KEY (never stored in source code)
+//   1. Entered on the Dashboard (Settings tab) -> settings.local.json (git-ignored, mode 0600)
+//   2. Optional fallback: GEMINI_API_KEY in a local .env file (git-ignored)
+// ------------------------------------------------------------------------------
+const SETTINGS_PATH = path.join(__dirname, 'settings.local.json');
 
-if (targetEnv) {
-  const envContent = fs.readFileSync(targetEnv, 'utf8');
-  const match = envContent.match(/GEMINI_API_KEY=([^\r\n]+)/);
-  if (match && match[1]) {
-    GEMINI_API_KEY = match[1].trim();
+function readEnvFileKey() {
+  try {
+    const envContent = fs.readFileSync(path.join(__dirname, '.env'), 'utf8');
+    const match = envContent.match(/^\s*GEMINI_API_KEY\s*=\s*([^\r\n]+)/m);
+    return match ? match[1].trim().replace(/^["']|["']$/g, '') : '';
+  } catch (e) {
+    return '';
+  }
+}
+
+function readLocalSettings() {
+  try {
+    return JSON.parse(fs.readFileSync(SETTINGS_PATH, 'utf8')) || {};
+  } catch (e) {
+    return {};
+  }
+}
+
+function writeLocalSettings(settings) {
+  fs.writeFileSync(SETTINGS_PATH, JSON.stringify(settings, null, 2), { encoding: 'utf8', mode: 0o600 });
+  try { fs.chmodSync(SETTINGS_PATH, 0o600); } catch (e) {}
+}
+
+// Dashboard key wins over .env
+function getGeminiKey() {
+  return readLocalSettings().geminiApiKey || readEnvFileKey() || '';
+}
+
+function getGeminiKeySource() {
+  if (readLocalSettings().geminiApiKey) return 'dashboard';
+  if (readEnvFileKey()) return 'env';
+  return 'none';
+}
+
+function maskKey(key) {
+  return key ? `••••••••${key.slice(-4)}` : '';
+}
+
+// Settings endpoints must only be driven by our own pages / extension, not by arbitrary websites
+function isTrustedOrigin(req) {
+  const origin = req.headers.origin;
+  if (!origin) return true; // curl, server-to-server
+  if (origin.startsWith('chrome-extension://')) return true;
+  try {
+    return new URL(origin).host === req.headers.host;
+  } catch (e) {
+    return false;
   }
 }
 
@@ -89,6 +132,101 @@ const server = http.createServer(async (req, res) => {
       'Access-Control-Allow-Private-Network': 'true'
     });
     res.end();
+    return;
+  }
+
+  // Settings: Gemini API key managed from the Dashboard (the full key is never sent back to the browser)
+  if (pathname === '/api/settings' && req.method === 'GET') {
+    if (!isTrustedOrigin(req)) {
+      res.writeHead(403, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Forbidden origin' }));
+      return;
+    }
+    const key = getGeminiKey();
+    res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
+    res.end(JSON.stringify({
+      geminiKeyConfigured: Boolean(key),
+      geminiKeyPreview: maskKey(key),
+      geminiKeySource: getGeminiKeySource()
+    }));
+    return;
+  }
+
+  if (pathname === '/api/settings/save' && req.method === 'POST') {
+    if (!isTrustedOrigin(req)) {
+      res.writeHead(403, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Forbidden origin' }));
+      return;
+    }
+    let body = '';
+    req.on('data', chunk => {
+      body += chunk;
+      if (body.length > 10000) req.destroy();
+    });
+    req.on('end', async () => {
+      const reply = (status, obj) => {
+        res.writeHead(status, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
+        res.end(JSON.stringify(obj));
+      };
+      try {
+        const payload = JSON.parse(body || '{}');
+        const newKey = String(payload.geminiApiKey || '').trim();
+        const settings = readLocalSettings();
+
+        // empty value = remove the dashboard key
+        if (!newKey) {
+          delete settings.geminiApiKey;
+          writeLocalSettings(settings);
+          const left = getGeminiKey();
+          reply(200, { ok: true, cleared: true, geminiKeyConfigured: Boolean(left), geminiKeyPreview: maskKey(left), geminiKeySource: getGeminiKeySource() });
+          return;
+        }
+
+        if (!/^[A-Za-z0-9._\-]{20,300}$/.test(newKey)) {
+          reply(400, { ok: false, error: 'Key không đúng định dạng (20-300 ký tự chữ, số, . _ -; không chứa khoảng trắng hoặc dấu nháy).' });
+          return;
+        }
+
+        // Verify with a free "list models" call before saving
+        let verified = null;
+        try {
+          const check = await makeHttpsRequest({
+            hostname: 'generativelanguage.googleapis.com',
+            path: `/v1beta/models?pageSize=1&key=${encodeURIComponent(newKey)}`,
+            method: 'GET'
+          });
+          if (check.status === 200) verified = true;
+          else if (check.status === 400 || check.status === 401 || check.status === 403) verified = false;
+        } catch (e) {
+          verified = null; // offline: cannot verify, still allow saving
+        }
+
+        if (verified === false) {
+          reply(400, { ok: false, error: 'Google từ chối key này (sai, hết hạn hoặc bị thu hồi). Chưa lưu.' });
+          return;
+        }
+
+        settings.geminiApiKey = newKey;
+        writeLocalSettings(settings);
+        sendSSEEvent('action_log', {
+          source: 'SaleHelp Server',
+          type: 'GEMINI_KEY_UPDATED',
+          detail: `Gemini API key updated from Dashboard (${maskKey(newKey)})`,
+          status: 'SUCCESS',
+          time: new Date().toLocaleTimeString()
+        });
+        reply(200, {
+          ok: true,
+          verified: verified === true,
+          warning: verified === null ? 'Chưa kiểm tra được key vì không kết nối được Google, key đã được lưu.' : undefined,
+          geminiKeyConfigured: true,
+          geminiKeyPreview: maskKey(newKey),
+          geminiKeySource: 'dashboard'
+        });
+      } catch (err) {
+        reply(400, { ok: false, error: 'Payload không hợp lệ' });
+      }
+    });
     return;
   }
 
@@ -223,14 +361,14 @@ const server = http.createServer(async (req, res) => {
     req.on('end', async () => {
       try {
         const payload = JSON.parse(body || '{}');
-        const apiKey = payload.apiKey || GEMINI_API_KEY;
+        const apiKey = payload.apiKey || getGeminiKey();
         const model = payload.model || 'gemini-3.6-flash';
         const prompt = payload.prompt || '';
         const systemInstruction = payload.systemInstruction || '';
 
         if (!apiKey) {
           res.writeHead(400, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ error: 'Missing GEMINI_API_KEY' }));
+          res.end(JSON.stringify({ error: 'Chưa có Gemini API key. Vào Dashboard > Settings để nhập key.' }));
           return;
         }
 
@@ -637,7 +775,7 @@ const server = http.createServer(async (req, res) => {
 server.listen(PORT, () => {
   console.log(`🚀 SaleHelp Real Multi-Channel Proxy Server running at http://localhost:${PORT}/`);
   console.log(`• Real Zalo OA Proxy: POST http://localhost:${PORT}/api/zalo/oauth/token & /api/zalo/message`);
-  console.log(`• Real Gemini AI Proxy: POST http://localhost:${PORT}/api/gemini/generate (Key loaded: ${GEMINI_API_KEY ? 'Yes' : 'No'})`);
+  console.log(`• Real Gemini AI Proxy: POST http://localhost:${PORT}/api/gemini/generate (Key loaded: ${getGeminiKey() ? 'Yes, source: ' + getGeminiKeySource() : 'No - open the Dashboard > Settings to add one'})`);
   console.log(`• Real Telegram Proxy: POST http://localhost:${PORT}/api/telegram/send`);
   console.log(`• Real Webhook Ingest: POST http://localhost:${PORT}/webhook/zalo (SSE Live Stream: /api/events)`);
 });
