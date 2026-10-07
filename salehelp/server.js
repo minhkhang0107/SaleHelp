@@ -268,6 +268,10 @@ const server = http.createServer(async (req, res) => {
           };
         }
 
+        if (payload.generationConfig && typeof payload.generationConfig === 'object') {
+          geminiBody.generationConfig = payload.generationConfig;
+        }
+
         const postData = JSON.stringify(geminiBody);
 
         const candidateModels = [
