@@ -1,0 +1,11 @@
+{
+  "name": "salehelp-server",
+  "version": "1.0.0",
+  "private": true,
+  "description": "SaleHelp local proxy server, profiles and Chrome extension",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --test \"test/**/*.test.js\"",
+    "lint": "node --check server.js && node --check profile_store.js && node --check extension/content.js && node --check extension/profile_prompt.js"
+  }
+}

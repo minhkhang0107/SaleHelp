@@ -7,8 +7,11 @@ const url = require('url');
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const { createProfileStore, ProfileError, PROFILE_TEMPLATES } = require('./profile_store');
 
-const PORT = 8080;
+const PORT = Number(process.env.PORT) || 8080;
+const DATA_DIR = process.env.SALEHELP_DATA_DIR || __dirname;
+const profileStore = createProfileStore({ dir: DATA_DIR });
 const STATIC_DIR = path.join(__dirname, 'web_dist');
 
 // ------------------------------------------------------------------------------
@@ -102,6 +105,49 @@ function makeHttpsRequest(options, postData) {
     }
     req.end();
   });
+}
+
+function readJsonBody(req, limit = 200000) {
+  return new Promise((resolve, reject) => {
+    let body = '';
+    let bytes = 0;
+    let exceeded = false;
+    req.on('data', chunk => {
+      if (exceeded) return;
+      bytes += chunk.length;
+      if (bytes > limit) {
+        exceeded = true;
+        req.destroy();
+        reject(new ProfileError('Request body exceeds limit', 413));
+        return;
+      }
+      body += chunk;
+    });
+    req.on('end', () => {
+      if (exceeded) return;
+      try {
+        const trimmed = body.trim();
+        const parsed = trimmed ? JSON.parse(trimmed) : {};
+        resolve(parsed);
+      } catch (err) {
+        reject(new ProfileError('Invalid JSON body', 400));
+      }
+    });
+    req.on('error', err => {
+      if (!exceeded) {
+        reject(err);
+      }
+    });
+  });
+}
+
+function sendProfileError(res, err) {
+  const status = (err instanceof ProfileError && err.status) ? err.status : 500;
+  res.writeHead(status, { 'Content-Type': 'application/json' });
+  res.end(JSON.stringify({
+    error: err && err.message ? err.message : 'Internal Server Error',
+    errors: err && err.errors
+  }));
 }
 
 const mimeTypes = {
@@ -469,86 +515,189 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  // 4a. Profiles API
+  if (pathname === '/api/profiles' && req.method === 'GET') {
+    try {
+      const data = profileStore.list();
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(data));
+    } catch (err) {
+      sendProfileError(res, err);
+    }
+    return;
+  }
+
+  if (pathname === '/api/profiles/active' && req.method === 'GET') {
+    try {
+      const active = profileStore.getActive();
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(active));
+    } catch (err) {
+      sendProfileError(res, err);
+    }
+    return;
+  }
+
+  if (pathname === '/api/profiles/templates' && req.method === 'GET') {
+    try {
+      const templates = Object.values(PROFILE_TEMPLATES);
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(templates));
+    } catch (err) {
+      sendProfileError(res, err);
+    }
+    return;
+  }
+
+  if (pathname === '/api/profiles/save' && req.method === 'POST') {
+    if (!isTrustedOrigin(req)) {
+      res.writeHead(403, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Forbidden origin' }));
+      return;
+    }
+    try {
+      const payload = await readJsonBody(req);
+      const profile = profileStore.upsert(payload);
+      sendSSEEvent('action_log', {
+        source: 'SaleHelp Dashboard',
+        type: 'PROFILE_SAVED',
+        detail: `Profile saved: ${profile.name} (${profile.id})`,
+        status: 'SUCCESS',
+        time: new Date().toLocaleTimeString()
+      });
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ success: true, profile }));
+    } catch (err) {
+      sendProfileError(res, err);
+    }
+    return;
+  }
+
+  if (pathname === '/api/profiles/set-active' && req.method === 'POST') {
+    if (!isTrustedOrigin(req)) {
+      res.writeHead(403, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Forbidden origin' }));
+      return;
+    }
+    try {
+      const payload = await readJsonBody(req);
+      const profile = profileStore.setActive(payload.profileId);
+      const activeProfileId = profile.id;
+      sendSSEEvent('action_log', {
+        source: 'SaleHelp Dashboard',
+        type: 'ACTIVE_PROFILE_CHANGED',
+        detail: `Switched active profile to: ${profile.name} (${profile.id})`,
+        status: 'SUCCESS',
+        time: new Date().toLocaleTimeString()
+      });
+      sendSSEEvent('profile_changed', { activeProfileId });
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ success: true, activeProfileId, profile }));
+    } catch (err) {
+      sendProfileError(res, err);
+    }
+    return;
+  }
+
+  if (pathname === '/api/profiles/delete' && req.method === 'POST') {
+    if (!isTrustedOrigin(req)) {
+      res.writeHead(403, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Forbidden origin' }));
+      return;
+    }
+    try {
+      const payload = await readJsonBody(req);
+      profileStore.remove(payload.profileId);
+      sendSSEEvent('action_log', {
+        source: 'SaleHelp Dashboard',
+        type: 'PROFILE_DELETED',
+        detail: `Profile deleted: ${payload.profileId}`,
+        status: 'SUCCESS',
+        time: new Date().toLocaleTimeString()
+      });
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ success: true }));
+    } catch (err) {
+      sendProfileError(res, err);
+    }
+    return;
+  }
+
   // 4b. Skills & Prompt Management API
   if (pathname === '/api/skills' && req.method === 'GET') {
-    const skillsPath = path.join(__dirname, 'skills_config.json');
-    let data = { activeSkillId: 'tour_closing_pro', skills: [] };
-    if (fs.existsSync(skillsPath)) {
-      try { data = JSON.parse(fs.readFileSync(skillsPath, 'utf8')); } catch (e) {}
+    try {
+      const data = profileStore.getSkills();
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(data));
+    } catch (err) {
+      sendProfileError(res, err);
     }
-    res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify(data));
     return;
   }
 
   if (pathname === '/api/skills/active' && req.method === 'GET') {
-    const skillsPath = path.join(__dirname, 'skills_config.json');
-    let data = { activeSkillId: 'tour_closing_pro', skills: [] };
-    if (fs.existsSync(skillsPath)) {
-      try { data = JSON.parse(fs.readFileSync(skillsPath, 'utf8')); } catch (e) {}
+    try {
+      const activeProfile = profileStore.getActive();
+      const skills = activeProfile.skills || [];
+      const activeSkill = skills.find(s => s && s.id === activeProfile.activeSkillId) || skills[0] || {};
+      const result = {
+        ...activeSkill,
+        profileId: activeProfile.id,
+        profileName: activeProfile.name
+      };
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(result));
+    } catch (err) {
+      sendProfileError(res, err);
     }
-    const active = data.skills.find(s => s.id === data.activeSkillId) || data.skills[0];
-    res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify(active || {}));
     return;
   }
 
   if (pathname === '/api/skills/save' && req.method === 'POST') {
-    let body = '';
-    req.on('data', chunk => body += chunk);
-    req.on('end', () => {
-      try {
-        const payload = JSON.parse(body || '{}');
-        const skillsPath = path.join(__dirname, 'skills_config.json');
-        fs.writeFileSync(skillsPath, JSON.stringify(payload, null, 2), 'utf8');
-
-        sendSSEEvent('action_log', {
-          source: 'SaleHelp Dashboard',
-          type: 'SKILL_PROMPT_UPDATED',
-          detail: `Active Skill: "${payload.activeSkillId}" updated & persisted`,
-          status: 'SUCCESS',
-          time: new Date().toLocaleTimeString()
-        });
-
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ success: true, message: 'Skill configuration saved successfully!' }));
-      } catch (err) {
-        res.writeHead(500, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ error: err.message }));
-      }
-    });
+    if (!isTrustedOrigin(req)) {
+      res.writeHead(403, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Forbidden origin' }));
+      return;
+    }
+    try {
+      const payload = await readJsonBody(req);
+      profileStore.saveSkills(payload);
+      sendSSEEvent('action_log', {
+        source: 'SaleHelp Dashboard',
+        type: 'SKILL_PROMPT_UPDATED',
+        detail: `Active Skill: "${payload.activeSkillId}" updated & persisted`,
+        status: 'SUCCESS',
+        time: new Date().toLocaleTimeString()
+      });
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ success: true, message: 'Skill configuration saved successfully!' }));
+    } catch (err) {
+      sendProfileError(res, err);
+    }
     return;
   }
 
   if (pathname === '/api/skills/set-active' && req.method === 'POST') {
-    let body = '';
-    req.on('data', chunk => body += chunk);
-    req.on('end', () => {
-      try {
-        const payload = JSON.parse(body || '{}');
-        const skillsPath = path.join(__dirname, 'skills_config.json');
-        let data = { activeSkillId: 'tour_closing_pro', skills: [] };
-        if (fs.existsSync(skillsPath)) {
-          data = JSON.parse(fs.readFileSync(skillsPath, 'utf8'));
-        }
-        data.activeSkillId = payload.skillId;
-        fs.writeFileSync(skillsPath, JSON.stringify(data, null, 2), 'utf8');
-
-        sendSSEEvent('action_log', {
-          source: 'SaleHelp Dashboard',
-          type: 'ACTIVE_SKILL_CHANGED',
-          detail: `Switched active skill to: ${payload.skillId}`,
-          status: 'SUCCESS',
-          time: new Date().toLocaleTimeString()
-        });
-
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ success: true, activeSkillId: data.activeSkillId }));
-      } catch (err) {
-        res.writeHead(500, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ error: err.message }));
-      }
-    });
+    if (!isTrustedOrigin(req)) {
+      res.writeHead(403, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Forbidden origin' }));
+      return;
+    }
+    try {
+      const payload = await readJsonBody(req);
+      profileStore.setActiveSkill(payload.skillId);
+      sendSSEEvent('action_log', {
+        source: 'SaleHelp Dashboard',
+        type: 'ACTIVE_SKILL_CHANGED',
+        detail: `Switched active skill to: ${payload.skillId}`,
+        status: 'SUCCESS',
+        time: new Date().toLocaleTimeString()
+      });
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ success: true, activeSkillId: payload.skillId }));
+    } catch (err) {
+      sendProfileError(res, err);
+    }
     return;
   }
 
@@ -593,40 +742,37 @@ const server = http.createServer(async (req, res) => {
 
   // 4d. Persona Configuration API
   if (pathname === '/api/persona' && req.method === 'GET') {
-    const personaPath = path.join(__dirname, 'persona_config.json');
-    let data = { name: 'Nguyễn Văn A', title: 'Chuyên viên tư vấn Tour Chuyên nghiệp (5 năm EXP)', tone: 'Lịch sự, nhiệt tình, tư vấn chi tiết lịch trình, xưng em gọi anh/chị' };
-    if (fs.existsSync(personaPath)) {
-      try { data = JSON.parse(fs.readFileSync(personaPath, 'utf8')); } catch (e) {}
+    try {
+      const data = profileStore.getPersona();
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(data));
+    } catch (err) {
+      sendProfileError(res, err);
     }
-    res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify(data));
     return;
   }
 
   if (pathname === '/api/persona/save' && req.method === 'POST') {
-    let body = '';
-    req.on('data', chunk => body += chunk);
-    req.on('end', () => {
-      try {
-        const payload = JSON.parse(body || '{}');
-        const personaPath = path.join(__dirname, 'persona_config.json');
-        fs.writeFileSync(personaPath, JSON.stringify(payload, null, 2), 'utf8');
-
-        sendSSEEvent('action_log', {
-          source: 'SaleHelp Dashboard',
-          type: 'PERSONA_UPDATED',
-          detail: `Persona updated: ${payload.name} (${payload.title})`,
-          status: 'SUCCESS',
-          time: new Date().toLocaleTimeString()
-        });
-
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ success: true, persona: payload }));
-      } catch (err) {
-        res.writeHead(500, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ error: err.message }));
-      }
-    });
+    if (!isTrustedOrigin(req)) {
+      res.writeHead(403, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Forbidden origin' }));
+      return;
+    }
+    try {
+      const payload = await readJsonBody(req);
+      const persona = profileStore.savePersona(payload);
+      sendSSEEvent('action_log', {
+        source: 'SaleHelp Dashboard',
+        type: 'PERSONA_UPDATED',
+        detail: `Persona updated: ${payload.name} (${payload.title})`,
+        status: 'SUCCESS',
+        time: new Date().toLocaleTimeString()
+      });
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ success: true, persona }));
+    } catch (err) {
+      sendProfileError(res, err);
+    }
     return;
   }
 
@@ -772,10 +918,22 @@ const server = http.createServer(async (req, res) => {
   });
 });
 
-server.listen(PORT, () => {
-  console.log(`🚀 SaleHelp Real Multi-Channel Proxy Server running at http://localhost:${PORT}/`);
-  console.log(`• Real Zalo OA Proxy: POST http://localhost:${PORT}/api/zalo/oauth/token & /api/zalo/message`);
-  console.log(`• Real Gemini AI Proxy: POST http://localhost:${PORT}/api/gemini/generate (Key loaded: ${getGeminiKey() ? 'Yes, source: ' + getGeminiKeySource() : 'No - open the Dashboard > Settings to add one'})`);
-  console.log(`• Real Telegram Proxy: POST http://localhost:${PORT}/api/telegram/send`);
-  console.log(`• Real Webhook Ingest: POST http://localhost:${PORT}/webhook/zalo (SSE Live Stream: /api/events)`);
-});
+if (require.main === module) {
+  server.listen(PORT, () => {
+    let activeProfileInfo = '';
+    try {
+      const active = profileStore.getActive();
+      activeProfileInfo = `${active.name} (${active.id})`;
+    } catch (e) {
+      activeProfileInfo = 'Unknown';
+    }
+    console.log(`🚀 SaleHelp Real Multi-Channel Proxy Server running at http://localhost:${PORT}/`);
+    console.log(`• Active profile: ${activeProfileInfo}`);
+    console.log(`• Real Zalo OA Proxy: POST http://localhost:${PORT}/api/zalo/oauth/token & /api/zalo/message`);
+    console.log(`• Real Gemini AI Proxy: POST http://localhost:${PORT}/api/gemini/generate (Key loaded: ${getGeminiKey() ? 'Yes, source: ' + getGeminiKeySource() : 'No - open the Dashboard > Settings to add one'})`);
+    console.log(`• Real Telegram Proxy: POST http://localhost:${PORT}/api/telegram/send`);
+    console.log(`• Real Webhook Ingest: POST http://localhost:${PORT}/webhook/zalo (SSE Live Stream: /api/events)`);
+  });
+}
+
+module.exports = { server };

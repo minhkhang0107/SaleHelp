@@ -133,6 +133,10 @@
       <span class="material-symbols-outlined">chat_bubble</span>
       <span class="label">Chat</span>
     </div>
+    <div class="nav-item" onclick="switchTab('profiles')" id="nav-profiles">
+      <span class="material-symbols-outlined">badge</span>
+      <span class="label">Profiles</span>
+    </div>
     <div class="nav-item" onclick="switchTab('knowledge')" id="nav-knowledge">
       <span class="material-symbols-outlined">dataset</span>
       <span class="label">Knowledge</span>
@@ -161,6 +165,164 @@
     <div class="tab-page active" id="page-chat">
       <div class="dashboard-container" id="chat-dashboard-container">
         <!-- Rendered dynamically depending on connected channels -->
+      </div>
+    </div>
+
+    <!-- PAGE: AI PROFILES -->
+    <div class="tab-page" id="page-profiles">
+      <div class="settings-page" style="max-width:1160px; margin:0 auto;">
+        <div class="page-header" style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:20px;">
+          <div>
+            <div class="page-title" style="display:flex; align-items:center; gap:8px;">
+              <span class="material-symbols-outlined" style="color:#0284C7; font-size:28px;">badge</span>
+              AI Profiles
+            </div>
+            <div class="page-sub">Mỗi profile là một bộ cấu hình AI riêng (persona, kịch bản, kho dữ liệu, cách tóm tắt). Chọn profile đang dùng để Chrome Extension trả lời theo profile đó.</div>
+          </div>
+          <div style="display:flex; gap:10px;">
+            <button type="button" style="padding:10px 16px; background:#0284C7; color:white; border:none; border-radius:8px; font-weight:600; cursor:pointer; display:flex; align-items:center; gap:6px;" onclick="openProfileTemplatesModal()">
+              <span class="material-symbols-outlined" style="font-size:18px;">content_copy</span> + Tạo từ mẫu
+            </button>
+            <button type="button" style="padding:10px 16px; background:var(--pure-surface); border:1px solid var(--whisper-border); color:var(--charcoal-ink); border-radius:8px; font-weight:600; cursor:pointer; display:flex; align-items:center; gap:6px;" onclick="createNewBlankProfile()">
+              <span class="material-symbols-outlined" style="font-size:18px;">add_circle</span> + Profile trống
+            </button>
+          </div>
+        </div>
+
+        <div style="display:grid; grid-template-columns: 310px 1fr; gap:20px;">
+          <!-- Left: Profiles Directory Cards -->
+          <div>
+            <div style="font-size:12px; font-weight:700; color:var(--muted-steel); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:10px;">Danh Sách Profiles</div>
+            <div id="profiles-list-container" style="display:flex; flex-direction:column; gap:10px;">
+              <!-- Rendered dynamically -->
+            </div>
+          </div>
+
+          <!-- Right: Profile Editor -->
+          <div style="background:white; border:1px solid var(--whisper-border); border-radius:12px; padding:20px; box-shadow:0 4px 14px rgba(0,0,0,0.03);">
+            <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:16px; padding-bottom:14px; border-bottom:1px solid #F1F5F9;">
+              <div>
+                <h3 id="profile-editor-heading" style="font-size:17px; font-weight:700; margin:0 0 4px 0; color:#0F172A;">Chỉnh sửa Profile</h3>
+                <div id="profile-editor-sub" style="font-size:12px; color:#64748B;">Cấu hình chi tiết Persona, Knowledge, Tham số sinh và Câu phản hồi</div>
+              </div>
+            </div>
+
+            <!-- Form fields -->
+            <div class="form-grid" style="margin-bottom:12px;">
+              <div class="form-group">
+                <label for="profile-edit-id">ID Profile (Định danh duy nhất)</label>
+                <input type="text" id="profile-edit-id" placeholder="VD: sales_tour">
+              </div>
+              <div class="form-group">
+                <label for="profile-edit-name">Tên Profile <span style="color:var(--alert-crimson);">*</span></label>
+                <input type="text" id="profile-edit-name" placeholder="VD: Tư Vấn Bán Hàng">
+              </div>
+            </div>
+
+            <div class="form-group" style="margin-bottom:12px;">
+              <label for="profile-edit-description">Mô tả Profile</label>
+              <input type="text" id="profile-edit-description" placeholder="Mô tả ngắn gọn mục đích sử dụng profile này...">
+            </div>
+
+            <div style="font-size:13px; font-weight:700; margin:16px 0 8px 0; color:#0F172A; display:flex; align-items:center; gap:6px;">
+              <span class="material-symbols-outlined" style="font-size:18px; color:#0284C7;">account_box</span> Persona đóng vai
+            </div>
+
+            <div class="form-grid" style="margin-bottom:12px;">
+              <div class="form-group">
+                <label for="profile-edit-persona-name">Tên Persona (Agent Name)</label>
+                <input type="text" id="profile-edit-persona-name" placeholder="VD: Nguyễn Văn A">
+              </div>
+              <div class="form-group">
+                <label for="profile-edit-persona-title">Chức danh / Kinh nghiệm</label>
+                <input type="text" id="profile-edit-persona-title" placeholder="VD: Chuyên viên tư vấn Tour (5 năm EXP)">
+              </div>
+            </div>
+
+            <div class="form-group" style="margin-bottom:14px;">
+              <label for="profile-edit-persona-tone">Tone giọng tư vấn</label>
+              <textarea id="profile-edit-persona-tone" rows="2" placeholder="VD: Lịch sự, nhiệt tình, xưng em gọi anh/chị..."></textarea>
+            </div>
+
+            <div style="font-size:13px; font-weight:700; margin:16px 0 8px 0; color:#0F172A; display:flex; align-items:center; gap:6px;">
+              <span class="material-symbols-outlined" style="font-size:18px; color:#0284C7;">dataset</span> Kho dữ liệu & RAG (Knowledge)
+            </div>
+
+            <div style="background:#F8FAFC; border:1px solid var(--whisper-border); border-radius:8px; padding:12px; margin-bottom:14px; display:flex; flex-direction:column; gap:8px;">
+              <label style="display:flex; align-items:center; gap:8px; font-size:13px; font-weight:600; cursor:pointer;">
+                <input type="checkbox" id="profile-edit-kn-enabled" onchange="onKnowledgeEnabledChange()">
+                Bật kho dữ liệu (Knowledge Enabled)
+              </label>
+              <div style="display:flex; gap:24px; margin-left:24px;">
+                <label style="display:flex; align-items:center; gap:6px; font-size:12px; color:#475569; cursor:pointer;">
+                  <input type="checkbox" id="profile-edit-kn-required">
+                  Bắt buộc có dữ liệu mới trả lời (Required)
+                </label>
+                <label style="display:flex; align-items:center; gap:6px; font-size:12px; color:#475569; cursor:pointer;">
+                  <input type="checkbox" id="profile-edit-kn-strict">
+                  Chặn suy diễn ngoài kho dữ liệu (Strict Guard)
+                </label>
+              </div>
+            </div>
+
+            <div style="font-size:13px; font-weight:700; margin:16px 0 8px 0; color:#0F172A; display:flex; align-items:center; gap:6px;">
+              <span class="material-symbols-outlined" style="font-size:18px; color:#0284C7;">tune</span> Tham số sinh AI (Generation Parameters)
+            </div>
+
+            <div class="form-grid" style="margin-bottom:14px;">
+              <div class="form-group">
+                <label for="profile-edit-temperature">Temperature (0.0 - 2.0)</label>
+                <input type="number" id="profile-edit-temperature" min="0" max="2" step="0.1" value="0.7">
+              </div>
+              <div class="form-group">
+                <label for="profile-edit-top-p">Top P (0.0 - 1.0)</label>
+                <input type="number" id="profile-edit-top-p" min="0" max="1" step="0.05" value="0.9">
+              </div>
+            </div>
+
+            <div class="form-group" style="margin-bottom:14px;">
+              <label for="profile-edit-summary-prompt">Tóm tắt hội thoại CRM (Summary Prompt)</label>
+              <textarea id="profile-edit-summary-prompt" rows="4" style="font-family:'JetBrains Mono', monospace; font-size:12px; line-height:1.4;" placeholder="Quy tắc tóm tắt hội thoại CRM..."></textarea>
+            </div>
+
+            <div class="form-grid" style="margin-bottom:14px;">
+              <div class="form-group">
+                <label for="profile-edit-replies-fallback">Câu trả lời dự phòng (Fallback Reply)</label>
+                <textarea id="profile-edit-replies-fallback" rows="3" placeholder="Tin nhắn khi AI không chắc chắn..."></textarea>
+              </div>
+              <div class="form-group">
+                <label for="profile-edit-replies-handoff">Tin nhắn chuyển giao (Handoff Reply)</label>
+                <textarea id="profile-edit-replies-handoff" rows="3" placeholder="Tin nhắn khi cần chuyển cho nhân viên..."></textarea>
+              </div>
+            </div>
+
+            <div class="form-group" style="margin-bottom:16px;">
+              <div id="profile-skills-summary" style="padding:10px 14px; background:#F8FAFC; border:1px solid var(--whisper-border); border-radius:8px; font-size:12.5px; color:#475569; display:flex; align-items:center; gap:8px;">
+                <span class="material-symbols-outlined" style="font-size:18px; color:#0284C7;">psychology</span>
+                <span>Kịch bản: 0 skill — sửa ở tab Skills & Prompts (sau khi chọn profile này làm profile đang dùng)</span>
+              </div>
+            </div>
+
+            <div id="profiles-message" style="font-size:13px; font-weight:600; min-height:20px; margin-bottom:12px; white-space:pre-line;"></div>
+
+            <div style="display:flex; justify-content:space-between; align-items:center; padding-top:12px; border-top:1px solid #F1F5F9;">
+              <div>
+                <button type="button" id="btn-delete-profile" style="padding:9px 16px; background:var(--pure-surface); border:1px solid var(--whisper-border); color:#B91C1C; border-radius:8px; font-weight:600; cursor:pointer;" onclick="deleteCurrentProfile()">
+                  Xóa
+                </button>
+              </div>
+              <div style="display:flex; gap:10px;">
+                <button type="button" id="btn-activate-profile" style="padding:9px 16px; background:#10B981; color:white; border:none; border-radius:8px; font-weight:700; cursor:pointer;" onclick="setActiveCurrentProfile()">
+                  ⭐ Dùng profile này
+                </button>
+                <button type="button" id="btn-save-profile" style="padding:9px 20px; background:#0284C7; color:white; border:none; border-radius:8px; font-weight:700; cursor:pointer; display:flex; align-items:center; gap:6px;" onclick="saveCurrentProfile()">
+                  <span class="material-symbols-outlined" style="font-size:16px;">save</span> Lưu
+                </button>
+              </div>
+            </div>
+
+          </div>
+        </div>
       </div>
     </div>
 
@@ -730,6 +892,28 @@
     </div>
   </div>
 
+  <!-- MODAL: CHỌN MẪU AI PROFILE -->
+  <div class="modal-backdrop" id="modal-profile-templates">
+    <div class="modal-box" style="width:540px; max-height:85vh; overflow-y:auto;">
+      <div class="modal-title" style="display:flex; justify-content:space-between; align-items:center;">
+        <div style="display:flex; align-items:center; gap:8px;">
+          <span class="material-symbols-outlined" style="color:#0284C7;">content_copy</span>
+          Chọn mẫu AI Profile
+        </div>
+        <button type="button" style="border:none; background:transparent; font-size:22px; cursor:pointer; color:var(--muted-steel); line-height:1;" onclick="closeModal('modal-profile-templates')">&times;</button>
+      </div>
+      <div style="font-size:13px; color:var(--muted-steel); margin-bottom:16px;">
+        Chọn mẫu có sẵn bên dưới. Hệ thống sẽ tự sao chép cấu hình mẫu (persona, kịch bản, câu trả lời...) vào trình chỉnh sửa dưới dạng profile mới.
+      </div>
+      <div id="profile-templates-list" style="display:flex; flex-direction:column; gap:10px; margin-bottom:16px;">
+        <!-- Rendered dynamically -->
+      </div>
+      <div class="modal-footer">
+        <button type="button" style="padding:8px 16px; background:transparent; border:none; color:var(--muted-steel); font-weight:600; cursor:pointer;" onclick="closeModal('modal-profile-templates')">Đóng</button>
+      </div>
+    </div>
+  </div>
+
   <script>
     // ==============================================================================
     // PURE WEB ZALO OA & MULTI-TENANT ENGINE (ZERO-BACKEND STANDALONE ARCHITECTURE)
@@ -843,6 +1027,7 @@
       renderChatDashboard();
       updateWebhookPayloadTemplate();
       loadSkillsData();
+      loadProfilesData();
       startTokenRefreshScheduler();
       initRealtimeWebhookListener();
       logApiTraffic('INFO', 'SaleHelp Real Multi-Channel Proxy Connected', {
@@ -892,6 +1077,12 @@
                 renderChatDashboard();
               }
             } catch (err) {}
+          });
+
+          evtSource.addEventListener('profile_changed', (e) => {
+            loadProfilesData();
+            loadPersonaData();
+            loadSkillsData();
           });
         } catch (err) {}
       }
@@ -1040,6 +1231,7 @@
       if (navEl) navEl.classList.add('active');
       if (pageEl) pageEl.classList.add('active');
       if (tab === 'settings') loadSettingsStatus();
+      if (tab === 'profiles') loadProfilesData();
     }
 
     // 7. ZALO OAUTH 2.0 PKCE ENGINE WITH SCOPES & STATE
@@ -2636,6 +2828,582 @@ TÊN KHÁCH HÀNG: "${conv.name}".
       saveCurrentSkillEdits();
       renderSkillsList();
       selectSkillToEdit(newSkill.id);
+    }
+
+    // ==============================================================================
+    // 17. AI PROFILES MANAGEMENT
+    // ==============================================================================
+    let profilesState = {
+      activeProfileId: '',
+      profiles: []
+    };
+    let currentSelectedProfileId = null;
+    let isEditingNewProfile = false;
+    let selectedProfileCopy = null;
+    let cachedTemplates = [];
+
+    function escapeHtml(str) {
+      if (str === null || str === undefined) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    function generateRandom4() {
+      const chars = 'abcdefghijklmnopqrstuvwxyz';
+      let res = '';
+      for (let i = 0; i < 4; i++) {
+        res += chars.charAt(Math.floor(Math.random() * chars.length));
+      }
+      return res;
+    }
+
+    function setProfilesMessage(text, ok) {
+      const msg = document.getElementById('profiles-message');
+      if (!msg) return;
+      msg.textContent = text;
+      msg.style.color = ok ? '#166534' : '#991B1B';
+    }
+
+    function onKnowledgeEnabledChange() {
+      const enabled = document.getElementById('profile-edit-kn-enabled')?.checked || false;
+      const reqEl = document.getElementById('profile-edit-kn-required');
+      const strictEl = document.getElementById('profile-edit-kn-strict');
+      if (!reqEl || !strictEl) return;
+      if (!enabled) {
+        reqEl.checked = false;
+        reqEl.disabled = true;
+        strictEl.checked = false;
+        strictEl.disabled = true;
+      } else {
+        reqEl.disabled = false;
+        strictEl.disabled = false;
+      }
+    }
+
+    async function loadProfilesData(preferredSelectId) {
+      try {
+        const res = await fetch('/api/profiles', { cache: 'no-store' });
+        if (res.ok) {
+          const data = await res.json();
+          profilesState = {
+            activeProfileId: data.activeProfileId || '',
+            profiles: Array.isArray(data.profiles) ? data.profiles : []
+          };
+          renderProfilesList();
+
+          if (preferredSelectId && profilesState.profiles.some(p => p.id === preferredSelectId)) {
+            selectProfileToEdit(preferredSelectId, false);
+          } else if (isEditingNewProfile) {
+            // Keep current new profile editor session in progress
+          } else if (currentSelectedProfileId && profilesState.profiles.some(p => p.id === currentSelectedProfileId)) {
+            selectProfileToEdit(currentSelectedProfileId);
+          } else {
+            const defaultId = profilesState.activeProfileId || (profilesState.profiles[0] && profilesState.profiles[0].id);
+            if (defaultId) {
+              selectProfileToEdit(defaultId);
+            }
+          }
+        }
+      } catch (e) {
+        console.warn('Lỗi tải danh sách profiles:', e);
+      }
+    }
+
+    function renderProfilesList() {
+      const container = document.getElementById('profiles-list-container');
+      if (!container) return;
+      container.innerHTML = '';
+
+      if (!profilesState.profiles || profilesState.profiles.length === 0) {
+        container.innerHTML = '<div style="color:var(--muted-steel); font-size:12px; padding:12px; background:white; border-radius:8px; border:1px solid var(--whisper-border);">Chưa có profile nào.</div>';
+        return;
+      }
+
+      profilesState.profiles.forEach(p => {
+        const isActive = p.id === profilesState.activeProfileId;
+        const isSelected = !isEditingNewProfile && (p.id === currentSelectedProfileId);
+        const hasKnowledge = Boolean(p.knowledge && p.knowledge.enabled);
+
+        const card = document.createElement('div');
+        card.style.cssText = `
+          padding: 12px 14px;
+          border-radius: 10px;
+          border: 1.5px solid ${isSelected ? '#0284C7' : 'var(--whisper-border)'};
+          background: ${isSelected ? 'rgba(2,132,199,0.04)' : 'white'};
+          cursor: pointer;
+          transition: all 0.15s ease;
+        `;
+        card.onclick = () => selectProfileToEdit(p.id);
+        card.innerHTML = `
+          <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:4px; gap:8px;">
+            <div style="font-size:13.5px; font-weight:700; color:#0F172A; word-break:break-word;">${escapeHtml(p.name)}</div>
+            ${isActive ? '<span style="font-size:10.5px; font-weight:700; color:#10B981; background:rgba(16,185,129,0.1); padding:2px 6px; border-radius:4px; white-space:nowrap; flex-shrink:0;">⭐ Đang dùng</span>' : ''}
+          </div>
+          <div style="font-size:11.5px; color:#64748B; line-height:1.35; margin-bottom:8px; word-break:break-word;">
+            ${escapeHtml(p.description || '')}
+          </div>
+          <div style="display:flex; gap:6px; flex-wrap:wrap; align-items:center;">
+            <span style="font-size:10.5px; font-weight:600; padding:2px 6px; border-radius:4px; ${hasKnowledge ? 'background:rgba(22,163,74,0.1); color:var(--safe-emerald);' : 'background:#F1F5F9; color:var(--muted-steel);'}">
+              Kho dữ liệu: ${hasKnowledge ? 'Bật' : 'Tắt'}
+            </span>
+          </div>
+        `;
+        container.appendChild(card);
+      });
+    }
+
+    function selectProfileToEdit(profileId, clearMessage = true) {
+      const p = profilesState.profiles.find(item => item.id === profileId);
+      if (!p) return;
+
+      isEditingNewProfile = false;
+      currentSelectedProfileId = p.id;
+      selectedProfileCopy = JSON.parse(JSON.stringify(p));
+
+      const idInput = document.getElementById('profile-edit-id');
+      const nameInput = document.getElementById('profile-edit-name');
+      const descInput = document.getElementById('profile-edit-description');
+      const persNameInput = document.getElementById('profile-edit-persona-name');
+      const persTitleInput = document.getElementById('profile-edit-persona-title');
+      const persToneInput = document.getElementById('profile-edit-persona-tone');
+      const knEnabledInput = document.getElementById('profile-edit-kn-enabled');
+      const knRequiredInput = document.getElementById('profile-edit-kn-required');
+      const knStrictInput = document.getElementById('profile-edit-kn-strict');
+      const tempInput = document.getElementById('profile-edit-temperature');
+      const topPInput = document.getElementById('profile-edit-top-p');
+      const summaryPromptInput = document.getElementById('profile-edit-summary-prompt');
+      const fallbackInput = document.getElementById('profile-edit-replies-fallback');
+      const handoffInput = document.getElementById('profile-edit-replies-handoff');
+      const skillsSummaryEl = document.getElementById('profile-skills-summary');
+      const btnActivate = document.getElementById('btn-activate-profile');
+      const btnDelete = document.getElementById('btn-delete-profile');
+      const headingEl = document.getElementById('profile-editor-heading');
+
+      if (headingEl) headingEl.textContent = `Chỉnh sửa Profile: ${p.name}`;
+      if (idInput) {
+        idInput.value = p.id;
+        idInput.readOnly = true;
+        idInput.style.background = '#F8FAFC';
+        idInput.style.color = '#64748B';
+        idInput.style.cursor = 'not-allowed';
+      }
+      if (nameInput) nameInput.value = p.name || '';
+      if (descInput) descInput.value = p.description || '';
+      if (persNameInput) persNameInput.value = p.persona?.name || '';
+      if (persTitleInput) persTitleInput.value = p.persona?.title || '';
+      if (persToneInput) persToneInput.value = p.persona?.tone || '';
+
+      const knEnabled = Boolean(p.knowledge?.enabled);
+      if (knEnabledInput) knEnabledInput.checked = knEnabled;
+      if (knRequiredInput) knRequiredInput.checked = knEnabled ? Boolean(p.knowledge?.required) : false;
+      if (knStrictInput) knStrictInput.checked = knEnabled ? Boolean(p.knowledge?.strictGuard) : false;
+      onKnowledgeEnabledChange();
+
+      if (tempInput) tempInput.value = (p.generation?.temperature !== undefined && p.generation?.temperature !== null) ? p.generation.temperature : 0.7;
+      if (topPInput) topPInput.value = (p.generation?.topP !== undefined && p.generation?.topP !== null) ? p.generation.topP : 0.9;
+      if (summaryPromptInput) summaryPromptInput.value = p.summaryPrompt || '';
+      if (fallbackInput) fallbackInput.value = p.replies?.fallback || '';
+      if (handoffInput) handoffInput.value = p.replies?.handoff || '';
+
+      const skillCount = Array.isArray(p.skills) ? p.skills.length : 0;
+      if (skillsSummaryEl) {
+        skillsSummaryEl.innerHTML = `
+          <span class="material-symbols-outlined" style="font-size:18px; color:#0284C7;">psychology</span>
+          <span>Kịch bản: ${skillCount} skill — sửa ở tab Skills & Prompts (sau khi chọn profile này làm profile đang dùng)</span>
+        `;
+      }
+
+      const isActive = p.id === profilesState.activeProfileId;
+      if (btnActivate) {
+        if (isActive) {
+          btnActivate.disabled = true;
+          btnActivate.style.display = 'none';
+        } else {
+          btnActivate.disabled = false;
+          btnActivate.style.display = 'inline-flex';
+        }
+      }
+
+      if (btnDelete) {
+        btnDelete.disabled = false;
+        btnDelete.style.display = 'inline-flex';
+      }
+
+      if (clearMessage) {
+        setProfilesMessage('', true);
+      }
+      renderProfilesList();
+    }
+
+    function createNewBlankProfile() {
+      isEditingNewProfile = true;
+      currentSelectedProfileId = null;
+
+      const newId = 'profile_' + generateRandom4();
+      selectedProfileCopy = {
+        id: newId,
+        name: 'Profile mới',
+        description: '',
+        persona: { name: '', title: '', tone: '' },
+        skills: [],
+        activeSkillId: '',
+        knowledge: { enabled: false, required: false, strictGuard: false },
+        generation: { temperature: 0.7, topP: 0.9 },
+        summaryPrompt: '',
+        replies: { fallback: '', handoff: '' }
+      };
+
+      const idInput = document.getElementById('profile-edit-id');
+      const nameInput = document.getElementById('profile-edit-name');
+      const descInput = document.getElementById('profile-edit-description');
+      const persNameInput = document.getElementById('profile-edit-persona-name');
+      const persTitleInput = document.getElementById('profile-edit-persona-title');
+      const persToneInput = document.getElementById('profile-edit-persona-tone');
+      const knEnabledInput = document.getElementById('profile-edit-kn-enabled');
+      const tempInput = document.getElementById('profile-edit-temperature');
+      const topPInput = document.getElementById('profile-edit-top-p');
+      const summaryPromptInput = document.getElementById('profile-edit-summary-prompt');
+      const fallbackInput = document.getElementById('profile-edit-replies-fallback');
+      const handoffInput = document.getElementById('profile-edit-replies-handoff');
+      const skillsSummaryEl = document.getElementById('profile-skills-summary');
+      const btnActivate = document.getElementById('btn-activate-profile');
+      const btnDelete = document.getElementById('btn-delete-profile');
+      const headingEl = document.getElementById('profile-editor-heading');
+
+      if (headingEl) headingEl.textContent = 'Tạo Profile Mới (Profile trống)';
+      if (idInput) {
+        idInput.value = newId;
+        idInput.readOnly = false;
+        idInput.style.background = '#FFFFFF';
+        idInput.style.color = '#0F172A';
+        idInput.style.cursor = 'text';
+      }
+      if (nameInput) nameInput.value = 'Profile mới';
+      if (descInput) descInput.value = '';
+      if (persNameInput) persNameInput.value = '';
+      if (persTitleInput) persTitleInput.value = '';
+      if (persToneInput) persToneInput.value = '';
+
+      if (knEnabledInput) knEnabledInput.checked = false;
+      onKnowledgeEnabledChange();
+
+      if (tempInput) tempInput.value = 0.7;
+      if (topPInput) topPInput.value = 0.9;
+      if (summaryPromptInput) summaryPromptInput.value = '';
+      if (fallbackInput) fallbackInput.value = '';
+      if (handoffInput) handoffInput.value = '';
+
+      if (skillsSummaryEl) {
+        skillsSummaryEl.innerHTML = `
+          <span class="material-symbols-outlined" style="font-size:18px; color:#0284C7;">psychology</span>
+          <span>Kịch bản: 0 skill — sửa ở tab Skills & Prompts (sau khi chọn profile này làm profile đang dùng)</span>
+        `;
+      }
+
+      if (btnActivate) {
+        btnActivate.disabled = true;
+        btnActivate.style.display = 'none';
+      }
+      if (btnDelete) {
+        btnDelete.disabled = true;
+        btnDelete.style.display = 'none';
+      }
+
+      setProfilesMessage('Đang soạn profile trống mới. Nhập thông tin và bấm "Lưu" để lưu vào hệ thống.', true);
+      renderProfilesList();
+    }
+
+    async function openProfileTemplatesModal() {
+      const modal = document.getElementById('modal-profile-templates');
+      if (modal) modal.classList.add('active');
+
+      const listContainer = document.getElementById('profile-templates-list');
+      if (!listContainer) return;
+      listContainer.innerHTML = '<div style="color:var(--muted-steel); font-size:13px;">Đang tải danh sách mẫu...</div>';
+
+      try {
+        const res = await fetch('/api/profiles/templates');
+        if (res.ok) {
+          cachedTemplates = await res.json();
+          renderProfileTemplatesModalList();
+        } else {
+          listContainer.innerHTML = '<div style="color:var(--alert-crimson); font-size:13px;">Lỗi tải danh sách mẫu.</div>';
+        }
+      } catch (e) {
+        listContainer.innerHTML = '<div style="color:var(--alert-crimson); font-size:13px;">Không kết nối được server.</div>';
+      }
+    }
+
+    function renderProfileTemplatesModalList() {
+      const listContainer = document.getElementById('profile-templates-list');
+      if (!listContainer) return;
+      listContainer.innerHTML = '';
+
+      if (!cachedTemplates || cachedTemplates.length === 0) {
+        listContainer.innerHTML = '<div style="color:var(--muted-steel); font-size:13px;">Không có mẫu nào.</div>';
+        return;
+      }
+
+      cachedTemplates.forEach(t => {
+        const skillCount = Array.isArray(t.skills) ? t.skills.length : 0;
+        const card = document.createElement('div');
+        card.style.cssText = `
+          border: 1px solid var(--whisper-border);
+          border-radius: 10px;
+          padding: 14px;
+          background: white;
+          cursor: pointer;
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          transition: all 0.15s ease;
+        `;
+        card.onmouseover = () => { card.style.borderColor = '#0284C7'; card.style.background = 'rgba(2,132,199,0.02)'; };
+        card.onmouseout = () => { card.style.borderColor = 'var(--whisper-border)'; card.style.background = 'white'; };
+        card.onclick = () => pickProfileTemplate(t.id);
+        card.innerHTML = `
+          <div style="flex:1; padding-right:12px;">
+            <div style="font-weight:700; font-size:14px; color:#0F172A; margin-bottom:4px;">${escapeHtml(t.name)}</div>
+            <div style="font-size:12px; color:#64748B; margin-bottom:6px;">${escapeHtml(t.description || '')}</div>
+            <div style="font-size:11px; color:#0284C7; font-weight:500;">
+              Persona: <b>${escapeHtml(t.persona?.name || '')}</b> (${escapeHtml(t.persona?.title || '')}) • ${skillCount} kỹ năng
+            </div>
+          </div>
+          <button type="button" style="padding:8px 14px; background:#0284C7; color:white; border:none; border-radius:6px; font-size:12px; font-weight:600; cursor:pointer; white-space:nowrap;">
+            Chọn mẫu
+          </button>
+        `;
+        listContainer.appendChild(card);
+      });
+    }
+
+    function pickProfileTemplate(templateId) {
+      const t = cachedTemplates.find(item => item.id === templateId);
+      if (!t) return;
+
+      isEditingNewProfile = true;
+      currentSelectedProfileId = null;
+
+      const rand4 = generateRandom4();
+      const newId = `${t.id}_${rand4}`;
+      const newName = `${t.name} (bản sao)`;
+
+      selectedProfileCopy = JSON.parse(JSON.stringify(t));
+      selectedProfileCopy.id = newId;
+      selectedProfileCopy.name = newName;
+
+      const idInput = document.getElementById('profile-edit-id');
+      const nameInput = document.getElementById('profile-edit-name');
+      const descInput = document.getElementById('profile-edit-description');
+      const persNameInput = document.getElementById('profile-edit-persona-name');
+      const persTitleInput = document.getElementById('profile-edit-persona-title');
+      const persToneInput = document.getElementById('profile-edit-persona-tone');
+      const knEnabledInput = document.getElementById('profile-edit-kn-enabled');
+      const knRequiredInput = document.getElementById('profile-edit-kn-required');
+      const knStrictInput = document.getElementById('profile-edit-kn-strict');
+      const tempInput = document.getElementById('profile-edit-temperature');
+      const topPInput = document.getElementById('profile-edit-top-p');
+      const summaryPromptInput = document.getElementById('profile-edit-summary-prompt');
+      const fallbackInput = document.getElementById('profile-edit-replies-fallback');
+      const handoffInput = document.getElementById('profile-edit-replies-handoff');
+      const skillsSummaryEl = document.getElementById('profile-skills-summary');
+      const btnActivate = document.getElementById('btn-activate-profile');
+      const btnDelete = document.getElementById('btn-delete-profile');
+      const headingEl = document.getElementById('profile-editor-heading');
+
+      if (headingEl) headingEl.textContent = `Tạo Profile Mới (từ mẫu: ${t.name})`;
+      if (idInput) {
+        idInput.value = newId;
+        idInput.readOnly = false;
+        idInput.style.background = '#FFFFFF';
+        idInput.style.color = '#0F172A';
+        idInput.style.cursor = 'text';
+      }
+      if (nameInput) nameInput.value = newName;
+      if (descInput) descInput.value = t.description || '';
+      if (persNameInput) persNameInput.value = t.persona?.name || '';
+      if (persTitleInput) persTitleInput.value = t.persona?.title || '';
+      if (persToneInput) persToneInput.value = t.persona?.tone || '';
+
+      const knEnabled = Boolean(t.knowledge?.enabled);
+      if (knEnabledInput) knEnabledInput.checked = knEnabled;
+      if (knRequiredInput) knRequiredInput.checked = knEnabled ? Boolean(t.knowledge?.required) : false;
+      if (knStrictInput) knStrictInput.checked = knEnabled ? Boolean(t.knowledge?.strictGuard) : false;
+      onKnowledgeEnabledChange();
+
+      if (tempInput) tempInput.value = (t.generation?.temperature !== undefined && t.generation?.temperature !== null) ? t.generation.temperature : 0.7;
+      if (topPInput) topPInput.value = (t.generation?.topP !== undefined && t.generation?.topP !== null) ? t.generation.topP : 0.9;
+      if (summaryPromptInput) summaryPromptInput.value = t.summaryPrompt || '';
+      if (fallbackInput) fallbackInput.value = t.replies?.fallback || '';
+      if (handoffInput) handoffInput.value = t.replies?.handoff || '';
+
+      const skillCount = Array.isArray(t.skills) ? t.skills.length : 0;
+      if (skillsSummaryEl) {
+        skillsSummaryEl.innerHTML = `
+          <span class="material-symbols-outlined" style="font-size:18px; color:#0284C7;">psychology</span>
+          <span>Kịch bản: ${skillCount} skill — sửa ở tab Skills & Prompts (sau khi chọn profile này làm profile đang dùng)</span>
+        `;
+      }
+
+      if (btnActivate) {
+        btnActivate.disabled = true;
+        btnActivate.style.display = 'none';
+      }
+      if (btnDelete) {
+        btnDelete.disabled = true;
+        btnDelete.style.display = 'none';
+      }
+
+      setProfilesMessage('Đã sao chép cấu hình từ mẫu. Tinh chỉnh các trường và bấm "Lưu" để tạo profile mới.', true);
+      closeModal('modal-profile-templates');
+      renderProfilesList();
+    }
+
+    async function saveCurrentProfile() {
+      const id = document.getElementById('profile-edit-id')?.value.trim() || '';
+      const name = document.getElementById('profile-edit-name')?.value.trim() || '';
+      const description = document.getElementById('profile-edit-description')?.value.trim() || '';
+      const personaName = document.getElementById('profile-edit-persona-name')?.value.trim() || '';
+      const personaTitle = document.getElementById('profile-edit-persona-title')?.value.trim() || '';
+      const personaTone = document.getElementById('profile-edit-persona-tone')?.value.trim() || '';
+      const knEnabled = document.getElementById('profile-edit-kn-enabled')?.checked || false;
+      const knRequired = knEnabled ? (document.getElementById('profile-edit-kn-required')?.checked || false) : false;
+      const knStrict = knEnabled ? (document.getElementById('profile-edit-kn-strict')?.checked || false) : false;
+      const tempRaw = document.getElementById('profile-edit-temperature')?.value;
+      const topPRaw = document.getElementById('profile-edit-top-p')?.value;
+      const tempVal = tempRaw === '' ? 0.7 : parseFloat(tempRaw);
+      const topPVal = topPRaw === '' ? 0.9 : parseFloat(topPRaw);
+      const summaryPrompt = document.getElementById('profile-edit-summary-prompt')?.value || '';
+      const fallback = document.getElementById('profile-edit-replies-fallback')?.value || '';
+      const handoff = document.getElementById('profile-edit-replies-handoff')?.value || '';
+
+      if (isEditingNewProfile && profilesState.profiles.some(p => p.id === id)) {
+        setProfilesMessage(`❌ ID "${id}" đã tồn tại, hãy chọn ID khác.`, false);
+        return;
+      }
+
+      const profilePayload = {
+        id: id,
+        name: name,
+        description: description,
+        persona: {
+          name: personaName,
+          title: personaTitle,
+          tone: personaTone
+        },
+        skills: (selectedProfileCopy && Array.isArray(selectedProfileCopy.skills)) ? selectedProfileCopy.skills : [],
+        activeSkillId: (selectedProfileCopy && selectedProfileCopy.activeSkillId) ? selectedProfileCopy.activeSkillId : '',
+        knowledge: {
+          enabled: knEnabled,
+          required: knRequired,
+          strictGuard: knStrict
+        },
+        summaryPrompt: summaryPrompt,
+        replies: {
+          fallback: fallback,
+          handoff: handoff
+        },
+        generation: {
+          temperature: Number.isNaN(tempVal) ? 0.7 : tempVal,
+          topP: Number.isNaN(topPVal) ? 0.9 : topPVal
+        }
+      };
+
+      const saveBtn = document.getElementById('btn-save-profile');
+      if (saveBtn) saveBtn.disabled = true;
+
+      try {
+        const res = await fetch('/api/profiles/save', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(profilePayload)
+        });
+        const data = await res.json();
+        if (res.ok && data.success) {
+          isEditingNewProfile = false;
+          currentSelectedProfileId = data.profile.id;
+          await loadProfilesData(data.profile.id);
+          if (data.profile.id === profilesState.activeProfileId) {
+            await loadPersonaData();
+            await loadSkillsData();
+          }
+          setProfilesMessage('✅ Đã lưu profile thành công!', true);
+        } else {
+          const errText = (data.errors && Array.isArray(data.errors) && data.errors.length)
+            ? data.errors.join('\n')
+            : (data.error || 'Lỗi lưu profile');
+          setProfilesMessage('❌ ' + errText, false);
+        }
+      } catch (e) {
+        setProfilesMessage('❌ Lỗi kết nối server: ' + e.message, false);
+      } finally {
+        if (saveBtn) saveBtn.disabled = false;
+      }
+    }
+
+    async function setActiveCurrentProfile() {
+      const profileId = isEditingNewProfile ? document.getElementById('profile-edit-id')?.value.trim() : currentSelectedProfileId;
+      if (!profileId) return;
+
+      const btnActivate = document.getElementById('btn-activate-profile');
+      if (btnActivate) btnActivate.disabled = true;
+
+      try {
+        const res = await fetch('/api/profiles/set-active', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ profileId })
+        });
+        const data = await res.json();
+        if (res.ok && data.success) {
+          await loadProfilesData(profileId);
+          await loadPersonaData();
+          await loadSkillsData();
+          setProfilesMessage('✅ Đã kích hoạt profile thành công! AI và Chrome Extension sẽ trả lời theo profile này.', true);
+        } else {
+          setProfilesMessage('❌ ' + (data.error || 'Lỗi khi kích hoạt profile'), false);
+        }
+      } catch (e) {
+        setProfilesMessage('❌ Lỗi kết nối server: ' + e.message, false);
+      } finally {
+        if (btnActivate) btnActivate.disabled = false;
+      }
+    }
+
+    async function deleteCurrentProfile() {
+      if (!currentSelectedProfileId) return;
+      const p = profilesState.profiles.find(item => item.id === currentSelectedProfileId);
+      const profileName = p ? p.name : currentSelectedProfileId;
+      if (!confirm(`Bạn có chắc chắn muốn xóa profile "${profileName}"?`)) {
+        return;
+      }
+
+      const btnDelete = document.getElementById('btn-delete-profile');
+      if (btnDelete) btnDelete.disabled = true;
+
+      try {
+        const res = await fetch('/api/profiles/delete', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ profileId: currentSelectedProfileId })
+        });
+        const data = await res.json();
+        if (res.ok && data.success) {
+          currentSelectedProfileId = null;
+          await loadProfilesData();
+          setProfilesMessage('✅ Đã xóa profile thành công!', true);
+        } else {
+          setProfilesMessage('❌ ' + (data.error || 'Lỗi khi xóa profile'), false);
+        }
+      } catch (e) {
+        setProfilesMessage('❌ Lỗi kết nối server: ' + e.message, false);
+      } finally {
+        if (btnDelete) btnDelete.disabled = false;
+      }
     }
 
     window.onload = initPage;

@@ -39,12 +39,17 @@ salehelp/
 ├── .env.example               # Mẫu .env (tuỳ chọn, để trống key)
 ├── settings.local.json        # (tự tạo) API key nhập từ Dashboard, KHÔNG nằm trong git
 ├── tours_config.json          # Kho tour (nguồn dữ liệu AI được phép dùng)
-├── persona_config.json        # Tên / chức danh / giọng điệu nhân viên tư vấn
-├── skills_config.json         # Các "skill" (prompt hệ thống) và skill đang bật
+├── profiles_config.json       # Các profile AI (persona + skill + cách trả lời) và profile đang dùng
+├── profile_store.js           # Đọc/ghi/kiểm tra profiles_config.json
+├── persona_config.json        # (cũ) chỉ dùng để chuyển đổi sang profiles_config.json lần đầu
+├── skills_config.json         # (cũ) chỉ dùng để chuyển đổi sang profiles_config.json lần đầu
+├── package.json               # npm test / npm run lint (không có dependency)
+├── test/                      # Test tự động (node:test)
 ├── web_dist/index.html        # Dashboard quản trị (1 file HTML, build sẵn)
 ├── extension/                 # Chrome extension
 │   ├── manifest.json
 │   ├── content.js             # Logic chính trên Zalo Web
+│   ├── profile_prompt.js      # Dựng system prompt / tham số AI từ profile đang dùng
 │   ├── background.js          # Gọi API server hộ content script
 │   ├── popup.html / popup.js  # Cửa sổ cấu hình khi bấm icon extension
 │   └── styles.css             # Giao diện widget nổi
@@ -135,9 +140,9 @@ pm2 save && pm2 startup      # tự chạy lại khi khởi động máy
 
 ### 3.6 Đổi cổng
 
-Cổng được **gán cứng** là `8080` ở đầu `server.js` (`const PORT = 8080;`). Muốn đổi cổng phải sửa đủ 3 nơi:
+Cổng mặc định là `8080`, đổi bằng biến môi trường `PORT` (ví dụ `PORT=9090 node server.js`). Muốn extension dùng cổng khác phải sửa đủ 3 nơi:
 
-1. `PORT` trong `server.js`
+1. Biến môi trường `PORT` khi chạy server
 2. `host_permissions` trong `extension/manifest.json` (hai dòng `localhost:8080` và `127.0.0.1:8080`)
 3. Ô **Server URL** trong popup của extension
 
@@ -145,9 +150,55 @@ Sau đó tải lại extension (xem mục 5).
 
 ## 4. Chuẩn bị dữ liệu cho AI
 
-AI **chỉ được phép** nêu giá, số ngày/đêm và dịch vụ có trong kho tour. Hãy nhập kho tour trước khi bật tự động trả lời. Kho trống thì extension sẽ không tự trả lời.
+Với profile bật kho dữ liệu (mặc định là `sales_tour`), AI **chỉ được phép** nêu giá, số ngày/đêm và dịch vụ có trong kho tour. Hãy nhập kho tour trước khi bật tự động trả lời. Kho trống thì extension sẽ không tự trả lời. Profile tắt kho dữ liệu (`work`, `dating`) không cần kho tour.
 
-Cách sửa dữ liệu: dùng Dashboard (tab **Knowledge** cho tour và persona, tab **Skills** cho skill) hoặc sửa trực tiếp các file JSON. Server đọc file mỗi lần có request nên **không cần khởi động lại**; extension tự đồng bộ lại sau tối đa ~8 giây.
+Cách sửa dữ liệu: dùng Dashboard (tab **Profiles** cho profile, tab **Knowledge** cho tour và persona của profile đang dùng, tab **Skills** cho skill của profile đang dùng) hoặc sửa trực tiếp các file JSON. Server đọc file mỗi lần có request nên **không cần khởi động lại**; extension tự đồng bộ lại sau tối đa ~8 giây.
+
+### `profiles_config.json` (Profiles)
+
+Một **profile** là một bộ cấu hình AI hoàn chỉnh. Có thể tạo nhiều profile và đổi profile đang dùng ngay trên server (Dashboard > **Profiles**, hoặc `POST /api/profiles/set-active`); extension tự áp dụng sau tối đa ~8 giây.
+
+Profile có sẵn:
+
+| ID | Dùng cho | Kho tour | Chặn sai giá |
+|---|---|---|---|
+| `sales_tour` | Tư vấn & chốt đơn tour (hành vi cũ) | Bật, bắt buộc | Có |
+| `work` | Trao đổi công việc với đồng nghiệp/đối tác | Tắt | Không |
+| `dating` | Trò chuyện / hẹn hò (thân thiện, tôn trọng, không phủ nhận là AI nếu bị hỏi thẳng) | Tắt | Không |
+
+```json
+{
+  "activeProfileId": "sales_tour",
+  "profiles": [
+    {
+      "id": "work",
+      "name": "🧑‍💼 Công Việc",
+      "description": "...",
+      "persona": { "name": "...", "title": "...", "tone": "..." },
+      "skills": [{ "id": "work_assistant", "name": "...", "category": "...", "description": "...", "systemPrompt": "..." }],
+      "activeSkillId": "work_assistant",
+      "knowledge": { "enabled": false, "required": false, "strictGuard": false },
+      "summaryPrompt": "...",
+      "replies": { "fallback": "...", "handoff": "..." },
+      "generation": { "temperature": 0.4, "topP": 0.9 }
+    }
+  ]
+}
+```
+
+| Trường | Ý nghĩa |
+|---|---|
+| `id` | 2–40 ký tự `a-z 0-9 _ -`, không đổi được sau khi tạo |
+| `persona` | Tên / chức danh / giọng điệu AI đóng vai |
+| `skills`, `activeSkillId` | Các system prompt của profile và prompt đang dùng. Placeholder: `{PERSONA_NAME}`, `{PERSONA_TITLE}`, `{PERSONA_TONE}`, `{CUSTOMER_NAME}` |
+| `knowledge.enabled` | Nối kho tour vào prompt |
+| `knowledge.required` | Kho trống thì không tự trả lời |
+| `knowledge.strictGuard` | Đối chiếu giá / số ngày đêm trong câu trả lời với kho, sai thì viết lại rồi dùng câu `handoff` |
+| `summaryPrompt` | Prompt tóm tắt hội thoại cũ của từng người (trí nhớ, mục 6.5) |
+| `replies.fallback` / `replies.handoff` | Câu dự phòng khi Gemini không trả lời / khi câu trả lời bị chặn |
+| `generation` | `temperature` (0–2), `topP` (0–1) |
+
+Lần đầu chạy, nếu chưa có `profiles_config.json`, server tự tạo file này từ 3 mẫu trên; profile `sales_tour` lấy persona và skill từ `persona_config.json` / `skills_config.json` cũ. File hỏng (JSON sai) thì server báo lỗi chứ không ghi đè. Không xóa được profile đang dùng hoặc profile cuối cùng.
 
 ### `tours_config.json`
 
@@ -174,16 +225,9 @@ Cách sửa dữ liệu: dùng Dashboard (tab **Knowledge** cho tour và persona
 
 Số tiền và thời lượng AI nói ra được đối chiếu với kho này. Nếu không khớp, câu trả lời bị chặn (xem mục 6.4).
 
-### `persona_config.json`
+### Persona và skill
 
-```json
-{ "name": "David", "title": "Chuyên viên tư vấn Tour (5 năm EXP)", "tone": "Lịch sự, nhiệt tình, xưng em gọi anh/chị" }
-```
-
-### `skills_config.json`
-
-Mỗi skill có một `systemPrompt`. `activeSkillId` là skill đang dùng. Trong `systemPrompt` có thể dùng các placeholder:
-`{PERSONA_NAME}`, `{PERSONA_TITLE}`, `{PERSONA_TONE}`, `{CUSTOMER_NAME}`. Kho tour luôn được tự động nối vào cuối prompt.
+Persona và skill nằm trong từng profile. Form Persona (tab Knowledge), tab Skills và các API `/api/persona*`, `/api/skills*` luôn đọc/ghi **profile đang dùng**. `persona_config.json` / `skills_config.json` không còn được đọc sau lần chuyển đổi đầu tiên.
 
 > Các file `*_config.json` đang được theo dõi bởi git. Mỗi lần sửa qua Dashboard, file thay đổi và hiện trong `git status`.
 
@@ -254,6 +298,7 @@ Widget nổi (kéo thả được, bấm `_` để thu nhỏ) hiển thị:
 | Tab | Chức năng |
 |---|---|
 | Chat | Giao diện hộp thư và chat thử với AI |
+| Profiles | Tạo (từ mẫu hoặc trống), sửa, xóa profile và chọn profile đang dùng |
 | Knowledge | Quản lý tour/ưu đãi và persona |
 | Channels | Kết nối kênh Zalo OA, Zalo cá nhân, Telegram, Facebook |
 | Skills | Tạo/sửa skill, chọn skill đang bật |
@@ -270,10 +315,16 @@ Tất cả trả JSON. CORS mở `*`, nên extension và Dashboard gọi đượ
 | POST | `/api/settings/save` | Lưu key: body `{"geminiApiKey":"..."}`, kiểm tra với Google trước khi lưu; gửi chuỗi rỗng để xóa. Chỉ nhận request từ Dashboard/extension (chặn `Origin` lạ) |
 | POST | `/api/gemini/generate` | Gọi Gemini. Body: `prompt`, `history[{role,text}]`, `systemInstruction`, `model`, `generationConfig`, `apiKey` (tuỳ chọn). Tự thử nhiều model dự phòng nếu model chính lỗi |
 | GET | `/api/tours` · POST `/api/tours/save` | Đọc / ghi kho tour |
-| GET | `/api/persona` · POST `/api/persona/save` | Đọc / ghi persona |
-| GET | `/api/skills` · `/api/skills/active` | Danh sách skill / skill đang bật |
-| POST | `/api/skills/save` · `/api/skills/set-active` | Lưu skill / đổi skill đang bật |
-| GET | `/api/events` | Luồng SSE realtime (log hành động, webhook) |
+| GET | `/api/profiles` | `{ activeProfileId, profiles }` |
+| GET | `/api/profiles/active` | Profile đang dùng (extension đọc endpoint này) |
+| GET | `/api/profiles/templates` | 3 profile mẫu |
+| POST | `/api/profiles/save` | Tạo / cập nhật profile (body = profile). Sai dữ liệu trả 400 kèm `errors[]` |
+| POST | `/api/profiles/set-active` | Đổi profile đang dùng: `{"profileId":"dating"}` |
+| POST | `/api/profiles/delete` | Xóa profile: `{"profileId":"..."}`. 409 nếu là profile đang dùng hoặc profile cuối |
+| GET | `/api/persona` · POST `/api/persona/save` | Đọc / ghi persona của profile đang dùng |
+| GET | `/api/skills` · `/api/skills/active` | Danh sách skill / skill đang bật của profile đang dùng (`/active` kèm `profileId`, `profileName`) |
+| POST | `/api/skills/save` · `/api/skills/set-active` | Lưu skill / đổi skill đang bật của profile đang dùng |
+| GET | `/api/events` | Luồng SSE realtime (log hành động, webhook, `profile_changed`) |
 | POST | `/webhook/zalo` (hoặc `/api/webhook/zalo`) | Nhận webhook Zalo OA, đẩy ra SSE. Hiện **chưa xác thực** chữ ký `X-ZEvent-Signature` |
 | POST | `/api/zalo/oauth/token` | Đổi `code` lấy access token Zalo OA (PKCE) |
 | POST | `/api/zalo/message` | Gửi tin qua Zalo OA (`userId`, `text`, `accessToken`) |
@@ -284,17 +335,19 @@ Tất cả trả JSON. CORS mở `*`, nên extension và Dashboard gọi đượ
 ## 8. Kiểm thử
 
 ```bash
+npm test                     # profile store, API profiles của server, dựng prompt của extension
+npm run lint                 # kiểm tra cú pháp server.js, profile_store.js, extension/*.js
 node test_zalo_oa_pure_web.js
 ```
 
-Chạy 4 test logic Zalo OA (PKCE, chữ ký HMAC-SHA256, định tuyến nhiều OA, làm mới token), không cần mạng. Chưa có test tự động cho extension; kiểm tra bằng cách mở Zalo Web và xem Console (`F12`), log của extension bắt đầu bằng `[SaleHelp]`.
+`npm test` chạy server trong thư mục tạm (`SALEHELP_DATA_DIR`) nên không sửa file trong repo. `test_zalo_oa_pure_web.js` chạy 4 test logic Zalo OA (PKCE, chữ ký HMAC-SHA256, định tuyến nhiều OA, làm mới token), không cần mạng. Phần thao tác DOM trên Zalo Web của extension chưa có test tự động; kiểm tra bằng cách mở Zalo Web và xem Console (`F12`), log của extension bắt đầu bằng `[SaleHelp]`.
 
 ## 9. Bảo mật: đọc trước khi đưa lên server thật
 
 Server được viết để chạy **trên máy cá nhân**, và hiện:
 
 - Lắng nghe trên **mọi giao diện mạng** (`0.0.0.0`), không chỉ localhost.
-- Không có xác thực. Ai truy cập được cổng 8080 đều đọc/sửa được kho tour, persona, skill và **dùng API key Gemini của bạn** qua `/api/gemini/generate`.
+- Không có xác thực. Ai truy cập được cổng 8080 đều đọc/sửa được kho tour, profile (persona, skill) và **dùng API key Gemini của bạn** qua `/api/gemini/generate`.
 - CORS `*` cho phép mọi trang web gọi vào server.
 
 Vì vậy: **không mở cổng 8080 ra internet**, không đưa lên VPS khi chưa thêm xác thực và giới hạn địa chỉ lắng nghe (`server.listen(PORT, '127.0.0.1')`). Nếu cần truy cập từ xa, đặt sau reverse proxy có xác thực (Nginx + Basic Auth, Cloudflare Access, Tailscale…).
@@ -315,7 +368,9 @@ Về API key:
 | Gemini trả 401 / 403 | Key sai, hết hạn hoặc bị thu hồi. Nhập key mới ở Settings |
 | Widget không hiện trên Zalo | Chưa F5 sau khi tải lại extension, hoặc extension chưa bật. Xem Console có dòng `[SaleHelp] AI Co-Pilot ... Loaded` không |
 | Có tin mới nhưng không tự click sang chat khác | Mở Console, tìm dòng `📥 Đã thêm [...] vào Hàng đợi`. Không có thì selector badge chưa đọc của Zalo không khớp, cần chỉnh `scanSidebarForIncomingUsers` trong `content.js`. Có thì xem cảnh báo `Chưa chuyển/nạp xong chat` |
-| AI không trả lời, widget báo "Chưa có dữ liệu tour" | Kho tour trống hoặc mọi tour đều `isActive: false` |
+| AI không trả lời, widget báo "Chưa có dữ liệu tour" | Profile đang dùng bắt buộc kho dữ liệu nhưng kho tour trống hoặc mọi tour đều `isActive: false`. Nhập tour hoặc đổi sang profile tắt kho dữ liệu |
+| Widget báo "Chưa tải được profile từ server" | Server chưa chạy hoặc `profiles_config.json` bị lỗi JSON (xem log server / `curl localhost:8080/api/profiles/active`) |
+| Đổi profile nhưng AI vẫn trả lời kiểu cũ | Chờ ~8 giây để extension đồng bộ, hoặc F5 tab Zalo |
 | Câu trả lời luôn là "xin phép kiểm tra lại…" | Giá/thời lượng AI nói không khớp kho. Xem log `Câu trả lời lần 1 bị chặn` trong Console; kiểm tra định dạng `price` / `title` trong kho |
 | Thêm tour trong Dashboard nhưng AI chưa biết | Chờ ~8 giây để extension đồng bộ, hoặc F5 tab Zalo |
 | Sau khi tải lại extension, tab Zalo lỗi `Extension context invalidated` | Bình thường. F5 tab Zalo |

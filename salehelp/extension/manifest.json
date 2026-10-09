@@ -31,7 +31,7 @@
   "content_scripts": [
     {
       "matches": ["https://chat.zalo.me/*"],
-      "js": ["content.js"],
+      "js": ["profile_prompt.js", "content.js"],
       "css": ["styles.css"],
       "run_at": "document_end"
     }
