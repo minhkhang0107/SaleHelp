@@ -1,6 +1,6 @@
 # SaleHelp – AI tự động tư vấn tour trên Zalo
 
-SaleHelp gồm hai phần chạy cùng nhau:
+SaleHelp là hệ thống AI tự động tư vấn và chăm sóc khách hàng trên Zalo Web (`chat.zalo.me`), kết hợp giữa một Node.js proxy server cục bộ và Chrome Extension Manifest V3. Hệ thống hỗ trợ nhiều profile nhân vật/kỹ năng (sales tour, công việc, hẹn hò), quản lý kho tri thức tour du lịch và áp dụng cơ chế chống bịa đặt giá/thời lượng nghiêm ngặt.
 
 | Thành phần | Vai trò | Công nghệ |
 |---|---|---|
@@ -22,96 +22,103 @@ SaleHelp gồm hai phần chạy cùng nhau:
 
 ---
 
-## 1. Yêu cầu
+## Bắt đầu nhanh
 
-- **Node.js 18 trở lên** (đã thử với v24). Kiểm tra: `node -v`
-- **Google Chrome** (hoặc trình duyệt Chromium hỗ trợ extension MV3)
-- **Gemini API key** lấy tại <https://aistudio.google.com/apikey>
-- Tài khoản Zalo đăng nhập được trên <https://chat.zalo.me>
+Quy trình 5 phút để chạy SaleHelp từ đầu đến cuối:
 
-Chạy server **không cần** Flutter, Dart hay melos. Phần Flutter ở cuối README chỉ dành cho ai phát triển app di động.
+1. **Kiểm tra môi trường Node.js (yêu cầu Node 18 trở lên):**
+   ```bash
+   node -v
+   ```
 
-## 2. Cấu trúc thư mục (phần liên quan)
+2. **Chuyển vào thư mục `salehelp` và khởi động server:**
+   ```bash
+   cd salehelp
+   npm start
+   # hoặc: node server.js
+   ```
+   Khi chạy lần đầu chưa có key, server sẽ in log:
+   ```
+   🚀 SaleHelp Real Multi-Channel Proxy Server running at http://localhost:8080/
+   • Real Gemini AI Proxy: POST http://localhost:8080/api/gemini/generate (Key loaded: No - open the Dashboard > Settings to add one)
+   ```
+   Key nhập ở bước 3 có hiệu lực ngay, không cần khởi động lại. Dòng log này chỉ in lúc khởi động, nên lần chạy sau sẽ thấy `Key loaded: Yes, source: dashboard`.
 
-```
-salehelp/
-├── server.js                  # Server Node.js (port 8080)
-├── .env.example               # Mẫu .env (tuỳ chọn, để trống key)
-├── settings.local.json        # (tự tạo) API key nhập từ Dashboard, KHÔNG nằm trong git
-├── tours_config.json          # Kho tour (nguồn dữ liệu AI được phép dùng)
-├── profiles_config.json       # Các profile AI (persona + skill + cách trả lời) và profile đang dùng
-├── profile_store.js           # Đọc/ghi/kiểm tra profiles_config.json
-├── persona_config.json        # (cũ) chỉ dùng để chuyển đổi sang profiles_config.json lần đầu
-├── skills_config.json         # (cũ) chỉ dùng để chuyển đổi sang profiles_config.json lần đầu
-├── package.json               # npm test / npm run lint (không có dependency)
-├── test/                      # Test tự động (node:test)
-├── web_dist/index.html        # Dashboard quản trị (1 file HTML, build sẵn)
-├── extension/                 # Chrome extension
-│   ├── manifest.json
-│   ├── content.js             # Logic chính trên Zalo Web
-│   ├── profile_prompt.js      # Dựng system prompt / tham số AI từ profile đang dùng
-│   ├── background.js          # Gọi API server hộ content script
-│   ├── popup.html / popup.js  # Cửa sổ cấu hình khi bấm icon extension
-│   └── styles.css             # Giao diện widget nổi
-└── test_zalo_oa_pure_web.js   # Test logic Zalo OA (PKCE, HMAC, refresh token)
-```
+3. **Cấu hình Gemini API key trên Dashboard:**
+   - Mở trình duyệt truy cập <http://localhost:8080>.
+   - Vào tab **Settings** (ở cuối thanh bên trái).
+   - Dán Gemini API key (lấy tại <https://aistudio.google.com/apikey>) rồi bấm **Lưu & kiểm tra**. Server gọi thử Google để xác thực key rồi mới lưu.
 
-## 3. Build & chạy server
+4. **Thêm dữ liệu tour (cần thiết cho profile mặc định `sales_tour`):**
+   - Vào tab **Knowledge** trên Dashboard.
+   - Thêm ít nhất 1 tour du lịch và đảm bảo trạng thái kích hoạt (`isActive: true`). Profile mặc định `sales_tour` bắt buộc có kho tour mới tự động trả lời để tránh bịa giá.
 
-Server **không có bước build**: Node chạy thẳng `server.js`, và Dashboard (`web_dist/index.html`) đã build sẵn.
+5. **Cài đặt Chrome Extension:**
+   - Mở Google Chrome (hoặc trình duyệt Chromium hỗ trợ MV3), truy cập `chrome://extensions`.
+   - Bật **Developer mode** ở góc trên bên phải.
+   - Bấm **Load unpacked** rồi chọn thư mục `salehelp/extension`.
+   - *(Tuỳ chọn)* Ghim biểu tượng **SaleHelp** lên thanh công cụ trình duyệt.
 
-### 3.1 Lấy mã nguồn
+6. **Bật tự động trả lời trên Zalo Web:**
+   - Truy cập <https://chat.zalo.me> và đăng nhập tài khoản Zalo.
+   - Widget SaleHelp sẽ xuất hiện ở góc màn hình. Bật công tắc **Tự động trả lời**.
+
+---
+
+## Build & chạy server
+
+### Không cần bước build
+
+Server **không có bước build**: Node chạy thẳng file `server.js`, không có dependency bên ngoài (không cần chạy `npm install`), và trang Dashboard (`web_dist/index.html`) đã được build sẵn thành một file HTML duy nhất.
+
+### Lấy mã nguồn
 
 ```bash
 git clone git@github.com:minhkhang0107/SaleHelp.git
 cd SaleHelp/salehelp          # đường dẫn có thể khác nếu repo được đặt trong thư mục khác
 ```
 
-### 3.2 Cấu hình Gemini API key
+### Cấu hình Gemini API key
 
 API key **không nằm trong source code**. Có 2 cách cung cấp, theo thứ tự ưu tiên:
 
-**Cách 1 (khuyến nghị): nhập trên Dashboard**
+**Cách 1 (khuyến nghị): Nhập trên Dashboard**
+1. Chạy server và mở <http://localhost:8080>.
+2. Vào tab **Settings** (cuối thanh bên trái).
+3. Dán API key rồi bấm **Lưu & kiểm tra**.
 
-1. Chạy server (mục 3.3) và mở <http://localhost:8080>
-2. Vào tab **Settings** (cuối thanh bên trái)
-3. Dán API key rồi bấm **Lưu & kiểm tra**
+Server gọi thử Google để xác nhận key hợp lệ rồi mới lưu. Key được ghi vào `settings.local.json` (quyền `0600`, đã nằm trong `.gitignore`) và áp dụng ngay cho mọi yêu cầu AI, kể cả extension Zalo, không cần khởi động lại server. Dashboard chỉ hiển thị 4 ký tự cuối của key; server không bao giờ trả key đầy đủ về trình duyệt. Nút **Xóa key** cho phép gỡ bỏ key đã lưu.
 
-Server gọi thử Google để xác nhận key hợp lệ rồi mới lưu. Key được ghi vào `settings.local.json` (quyền `0600`, đã nằm trong `.gitignore`) và dùng ngay cho mọi yêu cầu AI, kể cả extension Zalo, không cần khởi động lại. Dashboard chỉ hiển thị 4 ký tự cuối của key; server không bao giờ trả key đầy đủ về trình duyệt. Nút **Xóa key** xóa key đã lưu.
-
-**Cách 2 (dự phòng): file `.env`**
-
+**Cách 2 (dự phòng): File `.env`**
 ```bash
 cp .env.example .env     # .env nằm trong .gitignore
 ```
-
+Nội dung file `.env`:
 ```env
 GEMINI_API_KEY=<API key của bạn>
 ```
-
 Chỉ được dùng khi chưa có key nhập từ Dashboard. Server **không còn đọc** `.env.example`. File này được theo dõi bởi git nên để trống key.
 
-Lưu ý:
+**Lưu ý:**
 - Không bao giờ commit key thật lên git. Đừng dán key vào `.env.example`.
 - Có thể gửi key riêng cho từng request qua trường `apiKey` trong body của `/api/gemini/generate`; trường này được ưu tiên cao nhất.
 - Biến `GEMINI_PROXY_ENDPOINT` cũ chỉ dùng cho app Flutter, server Node bỏ qua.
 
-### 3.3 Chạy
+### Chạy server
 
 ```bash
-node server.js
+npm start
+# hoặc: node server.js
 ```
 
-Thấy các dòng sau là server đã lên:
-
+Thấy các dòng sau là server đã sẵn sàng:
 ```
 🚀 SaleHelp Real Multi-Channel Proxy Server running at http://localhost:8080/
-• Real Gemini AI Proxy: POST http://localhost:8080/api/gemini/generate (Key loaded: Yes)
+• Real Gemini AI Proxy: POST http://localhost:8080/api/gemini/generate (Key loaded: Yes, source: dashboard)
 ```
+`source` là `dashboard` hoặc `env` tuỳ key lấy từ đâu. Dòng `Key loaded: No ...` nghĩa là chưa có key nào. Vào Dashboard > Settings để nhập key.
 
-Dòng `Key loaded: No` nghĩa là chưa có key nào. Vào Dashboard > Settings để nhập (mục 3.2).
-
-### 3.4 Kiểm tra nhanh
+### Kiểm tra nhanh
 
 ```bash
 curl http://localhost:8080/api/persona      # trả JSON persona
@@ -121,14 +128,14 @@ curl -X POST http://localhost:8080/api/gemini/generate \
      -d '{"prompt":"Xin chào"}'             # trả về câu trả lời của Gemini
 ```
 
-Gọi `/api/gemini/generate` mà nhận lỗi `Chưa có Gemini API key` thì chưa nhập key. Nhận `401 ... invalid authentication credentials` thì key sai hoặc đã bị thu hồi.
+- Gọi `/api/gemini/generate` mà nhận lỗi `Chưa có Gemini API key` thì chưa nhập key.
+- Nhận lỗi `401 ... invalid authentication credentials` thì key sai hoặc đã bị thu hồi.
+- Mở <http://localhost:8080> trên trình duyệt để vào Dashboard.
 
-Mở <http://localhost:8080> để vào Dashboard.
-
-### 3.5 Chạy nền / tự khởi động lại
+### Chạy nền và tự khởi động lại
 
 ```bash
-# Cách đơn giản
+# Cách đơn giản bằng nohup
 nohup node server.js > server.log 2>&1 &
 
 # Hoặc dùng pm2 (khuyến nghị nếu chạy lâu dài)
@@ -138,33 +145,132 @@ pm2 logs salehelp
 pm2 save && pm2 startup      # tự chạy lại khi khởi động máy
 ```
 
-### 3.6 Đổi cổng
+### Đổi cổng server
 
-Cổng mặc định là `8080`, đổi bằng biến môi trường `PORT` (ví dụ `PORT=9090 node server.js`). Muốn extension dùng cổng khác phải sửa đủ 3 nơi:
+Cổng mặc định là `8080`. Bạn có thể đổi bằng biến môi trường `PORT` (ví dụ `PORT=9090 npm start` hoặc `PORT=9090 node server.js`). Khi đổi cổng, để extension hoạt động bình thường bạn phải sửa đủ **3 nơi**:
 
-1. Biến môi trường `PORT` khi chạy server
-2. `host_permissions` trong `extension/manifest.json` (hai dòng `localhost:8080` và `127.0.0.1:8080`)
-3. Ô **Server URL** trong popup của extension
+1. Biến môi trường `PORT` khi khởi động server (`PORT=...`).
+2. `host_permissions` trong file `extension/manifest.json` (hai dòng `localhost:8080` và `127.0.0.1:8080` đổi sang port mới).
+3. Ô **Server URL** trong cửa sổ popup của extension (`http://localhost:<PORT>`).
 
-Sau đó tải lại extension (xem mục 5).
+Sau khi sửa cổng, hãy tải lại extension theo hướng dẫn bên dưới.
 
-## 4. Chuẩn bị dữ liệu cho AI
+---
 
-Với profile bật kho dữ liệu (mặc định là `sales_tour`), AI **chỉ được phép** nêu giá, số ngày/đêm và dịch vụ có trong kho tour. Hãy nhập kho tour trước khi bật tự động trả lời. Kho trống thì extension sẽ không tự trả lời. Profile tắt kho dữ liệu (`work`, `dating`) không cần kho tour.
+## Cài Chrome Extension
 
-Cách sửa dữ liệu: dùng Dashboard (tab **Profiles** cho profile, tab **Knowledge** cho tour và persona của profile đang dùng, tab **Skills** cho skill của profile đang dùng) hoặc sửa trực tiếp các file JSON. Server đọc file mỗi lần có request nên **không cần khởi động lại**; extension tự đồng bộ lại sau tối đa ~8 giây.
+### Cài đặt
 
-### `profiles_config.json` (Profiles)
+1. Mở trình duyệt Chrome, truy cập `chrome://extensions`.
+2. Bật công tắc **Developer mode** ở góc trên bên phải.
+3. Bấm nút **Load unpacked** rồi chọn thư mục `salehelp/extension`.
+4. (Tuỳ chọn) Ghim icon **SaleHelp** lên thanh công cụ trình duyệt.
+5. Mở <https://chat.zalo.me> và đăng nhập tài khoản Zalo. Widget SaleHelp sẽ hiển thị nổi trên trang web.
 
-Một **profile** là một bộ cấu hình AI hoàn chỉnh. Có thể tạo nhiều profile và đổi profile đang dùng ngay trên server (Dashboard > **Profiles**, hoặc `POST /api/profiles/set-active`); extension tự áp dụng sau tối đa ~8 giây.
+### Tải lại sau khi sửa code
 
-Profile có sẵn:
+Sau khi chỉnh sửa code trong thư mục `extension/`:
+1. Vào `chrome://extensions`, bấm biểu tượng tải lại (reload) tại thẻ tiện ích SaleHelp.
+2. **F5 lại tab Zalo Web**. Nếu chỉ tải lại extension mà không F5 tab Zalo thì trang chat vẫn tiếp tục chạy mã nguồn cũ trong bộ nhớ.
+
+### Cấu hình trong popup
+
+Bấm vào biểu tượng SaleHelp trên thanh công cụ Chrome để mở cửa sổ cấu hình:
+
+| Mục | Ý nghĩa |
+|---|---|
+| Tự động trả lời | Bật/tắt tính năng auto-reply |
+| Server URL | Địa chỉ server Node.js (mặc định: `http://localhost:8080`) |
+| Độ trễ | Số giây chờ trước khi tự gửi câu trả lời (tạo cảm giác tự nhiên như người thật) |
+| **Lưu** | Ghi thông tin cấu hình vào `chrome.storage` |
+
+Popup còn có nút mở nhanh Dashboard, nút mở Zalo Web và một nhãn trạng thái cho biết extension đã kết nối được với server hay chưa.
+
+---
+
+## Sử dụng hằng ngày
+
+### Giao diện widget trên Zalo Web
+
+Widget nổi (có thể kéo thả vị trí tuỳ ý, bấm `_` để thu nhỏ) cung cấp các thông tin và thao tác:
+
+- **Tự động trả lời**: Công tắc bật/tắt chế độ tự động.
+- **Skill & Knowledge**: Hiển thị skill đang dùng. Bấm vào để mở nhanh Dashboard chỉnh sửa.
+- **Đang chat với**: Tên khách hàng ở cuộc hội thoại đang mở và nội dung tin nhắn mới nhất chưa được trả lời.
+- **Hàng đợi (Queue)**: Danh sách những khách hàng khác đang gửi tin nhắn đến nhưng chưa được xử lý.
+- **⚡ Trả Lời Người Này**: Ép AI soạn câu trả lời ngay lập tức cho chat đang mở (hoạt động cả khi tắt tự động trả lời).
+- **📋 Copy**: Sao chép nhanh nội dung AI vừa soạn thảo vào clipboard để chỉnh sửa hoặc gửi thủ công.
+- **Chấm trạng thái**: Màu xanh báo hiệu kết nối server tốt; màu đỏ báo hiệu server chưa chạy hoặc mất kết nối.
+
+### Luồng tự động
+
+1. Mỗi chu kỳ 1,5 giây, extension quét cuộc trò chuyện đang mở. Nếu tin nhắn cuối cùng là của khách hàng và chưa được trả lời, extension lấy lịch sử hội thoại kết hợp kho tour gửi đến Gemini qua server.
+2. Extension chờ đủ số giây "độ trễ" đã thiết lập, tự động điền câu trả lời vào khung chat của Zalo và nhấn gửi.
+3. Khi có khách hàng khác nhắn tới trong danh sách chat, họ sẽ được đưa vào hàng đợi. Sau khi hoàn thành cuộc trò chuyện hiện tại, extension tự động nhấp chuyển sang khách tiếp theo.
+
+### Xử lý nhiều khách cùng lúc
+
+- Khi đang trả lời khách A mà khách B gửi tin nhắn tới: B sẽ nằm chờ trong hàng đợi, AI phục vụ xong A mới chuyển sang B.
+- Nếu khách B phải chờ quá **20 giây**, lượt của A sẽ không được bắt đầu thêm câu trả lời mới mà nhường quyền ưu tiên cho B (quy định bởi hằng số `MAX_QUEUE_WAIT_MS` trong `content.js`).
+- Nếu bạn tự dùng chuột nhấp chuyển sang cuộc trò chuyện khác trong lúc AI đang chờ gửi cho khách A, tác vụ gửi cho A sẽ **bị hủy ngay lập tức** (để tránh gửi nhầm nội dung sang người khác) và khách A được đưa trở lại hàng đợi.
+
+### Chọn và chuyển đổi profile
+
+- Bạn có thể chuyển đổi profile linh hoạt ngay trên Dashboard (tab **Profiles**) hoặc gọi API `POST /api/profiles/set-active`.
+- Extension tự động đồng bộ sang profile mới sau tối đa ~8 giây mà không cần khởi động lại server hay tải lại trang Zalo.
+
+### Chống bịa thông tin
+
+- Nhiệt độ sinh (`temperature`) không cố định toàn cục mà được cấu hình riêng trong từng profile tại trường `generation.temperature` (mặc định: `sales_tour` đặt 0.2 để giữ câu trả lời chuẩn xác, `work` đặt 0.4, `dating` đặt 0.8 để tự nhiên và linh hoạt hơn).
+- Cơ chế kiểm soát giá và thời lượng nghiêm ngặt chỉ kích hoạt khi profile có cấu hình `knowledge.strictGuard: true` (mặc định chỉ có profile `sales_tour` bật cờ này).
+- Khi bật `strictGuard`, trước khi gửi câu trả lời, extension tự động quét và đối chiếu mọi **số tiền** cùng **thời lượng (3N2Đ, 4 ngày 3 đêm...)** xuất hiện trong câu trả lời với kho dữ liệu tour. Nếu phát hiện số liệu không khớp, AI được yêu cầu viết lại một lần. Nếu lần hai vẫn sai lệch, extension sẽ hủy bỏ và gửi câu an toàn đã cấu hình trong `replies.handoff` ("em xin phép kiểm tra lại với bộ phận điều hành…"), đồng thời hiển thị cảnh báo trên widget. Nội dung bị chặn được ghi lại chi tiết trong Console của tab Zalo.
+- Với profile yêu cầu dữ liệu bắt buộc (`knowledge.required: true` như `sales_tour`), nếu kho tour trống hoặc mọi tour đều ở trạng thái `isActive: false`, extension sẽ từ chối trả lời tự động để tránh bịa đặt thông tin.
+- **Giới hạn**: Hệ thống kiểm tra chặt chẽ số tiền và thời lượng, nhưng không tự động phát hiện được việc bịa tên điểm tham quan hoặc các dịch vụ đi kèm ngoài tour.
+
+### Trí nhớ theo từng khách hàng
+
+- Lịch sử hội thoại của từng khách được lưu trữ biệt lập (dựa theo tên hiển thị) trong `chrome.storage` của extension, hoàn toàn không bị nhầm lẫn giữa các khách hàng khác nhau.
+- Khi một cuộc hội thoại vượt quá 40 tin nhắn, phần hội thoại cũ sẽ được AI tự động tóm tắt thành các tiêu chí chính (nhu cầu, thời gian, số lượng người, ngân sách, tour quan tâm, đầu việc cần làm, trạng thái) để đưa vào system prompt. 16 tin nhắn gần nhất được giữ nguyên văn. Các ngưỡng này được quy định bởi `SUMMARIZE_THRESHOLD` và `SUMMARIZE_KEEP_RECENT` trong `content.js`.
+- Bộ nhớ lưu trữ tối đa thông tin của 200 khách hàng; khách hàng lâu nhất không tương tác sẽ tự động được xoá trước.
+- Lưu ý: Trường hợp hai khách hàng có tên hiển thị hoàn toàn trùng nhau thì sẽ dùng chung bộ nhớ.
+- Muốn xóa toàn bộ trí nhớ: Vào `chrome://extensions` → SaleHelp → *Details* → *Clear data*, hoặc mở Console của extension và chạy:
+  ```javascript
+  chrome.storage.local.remove('salehelp_memory');
+  ```
+
+### Các tab trên Dashboard (`http://localhost:8080`)
+
+| Tab | Chức năng |
+|---|---|
+| Chat | Giao diện hộp thư và khung chat thử nghiệm trực tiếp với AI |
+| Profiles | Tạo mới (từ mẫu hoặc trống), chỉnh sửa, xoá profile và chọn profile đang kích hoạt |
+| Knowledge | Quản lý danh sách tour du lịch, ưu đãi và persona của profile đang kích hoạt |
+| Channels | Cấu hình kết nối kênh Zalo OA, Zalo cá nhân, Telegram, Facebook |
+| Skills | Tạo và sửa đổi skill, chọn skill đang được kích hoạt |
+| Webhooks | Theo dõi luồng sự kiện realtime dạng Server-Sent Events (SSE) |
+| Settings | Cấu hình nhập hoặc xoá Gemini API key |
+
+---
+
+## Dữ liệu cho AI
+
+Với các profile có bật kho dữ liệu (mặc định là `sales_tour`), AI **chỉ được phép** cung cấp thông tin về giá, số ngày/đêm và dịch vụ có sẵn trong kho tour. Hãy thêm dữ liệu tour vào hệ thống trước khi bật chế độ tự động trả lời; nếu kho trống, extension sẽ không tự phát sinh câu trả lời. Các profile không sử dụng kho dữ liệu (`work`, `dating`) không cần nhập kho tour.
+
+Dữ liệu có thể chỉnh sửa trực tiếp qua Dashboard (tab **Profiles** cho profile, tab **Knowledge** cho tour và persona, tab **Skills** cho skill) hoặc chỉnh sửa file JSON trong thư mục `salehelp`. Server nạp lại file mỗi khi có yêu cầu nên **không cần khởi động lại server**; extension sẽ tự động cập nhật sau tối đa ~8 giây.
+
+### `profiles_config.json`
+
+Một **profile** là một gói cấu hình AI độc lập hoàn chỉnh. Bạn có thể thiết lập nhiều profile khác nhau và lựa chọn profile hoạt động ngay trên Dashboard (tab **Profiles**) hoặc qua endpoint `POST /api/profiles/set-active`.
+
+Các profile dựng sẵn:
 
 | ID | Dùng cho | Kho tour | Chặn sai giá |
 |---|---|---|---|
-| `sales_tour` | Tư vấn & chốt đơn tour (hành vi cũ) | Bật, bắt buộc | Có |
-| `work` | Trao đổi công việc với đồng nghiệp/đối tác | Tắt | Không |
+| `sales_tour` | Tư vấn & chốt đơn tour du lịch (hành vi cũ) | Bật, bắt buộc | Có |
+| `work` | Trao đổi công việc chuyên nghiệp với đồng nghiệp/đối tác | Tắt | Không |
 | `dating` | Trò chuyện / hẹn hò (thân thiện, tôn trọng, không phủ nhận là AI nếu bị hỏi thẳng) | Tắt | Không |
+
+Cấu trúc file mẫu:
 
 ```json
 {
@@ -186,21 +292,25 @@ Profile có sẵn:
 }
 ```
 
+Ý nghĩa các trường trong Profile:
+
 | Trường | Ý nghĩa |
 |---|---|
-| `id` | 2–40 ký tự `a-z 0-9 _ -`, không đổi được sau khi tạo |
+| `id` | Định danh profile (2–40 ký tự gồm `a-z`, `0-9`, `_`, `-`), không đổi được sau khi tạo |
 | `persona` | Tên / chức danh / giọng điệu AI đóng vai |
-| `skills`, `activeSkillId` | Các system prompt của profile và prompt đang dùng. Placeholder: `{PERSONA_NAME}`, `{PERSONA_TITLE}`, `{PERSONA_TONE}`, `{CUSTOMER_NAME}` |
-| `knowledge.enabled` | Nối kho tour vào prompt |
-| `knowledge.required` | Kho trống thì không tự trả lời |
+| `skills`, `activeSkillId` | Các system prompt của profile và prompt đang dùng. Hỗ trợ placeholder: `{PERSONA_NAME}`, `{PERSONA_TITLE}`, `{PERSONA_TONE}`, `{CUSTOMER_NAME}` |
+| `knowledge.enabled` | Nối kho tour vào system prompt |
+| `knowledge.required` | Nếu kho trống thì extension từ chối tự động trả lời |
 | `knowledge.strictGuard` | Đối chiếu giá / số ngày đêm trong câu trả lời với kho, sai thì viết lại rồi dùng câu `handoff` |
-| `summaryPrompt` | Prompt tóm tắt hội thoại cũ của từng người (trí nhớ, mục 6.5) |
+| `summaryPrompt` | Prompt tóm tắt hội thoại cũ của từng người (trí nhớ, mục Sử dụng hằng ngày) |
 | `replies.fallback` / `replies.handoff` | Câu dự phòng khi Gemini không trả lời / khi câu trả lời bị chặn |
-| `generation` | `temperature` (0–2), `topP` (0–1) |
+| `generation` | Cấu hình tham số sinh của model: `temperature` (0–2), `topP` (0–1) |
 
 Lần đầu chạy, nếu chưa có `profiles_config.json`, server tự tạo file này từ 3 mẫu trên; profile `sales_tour` lấy persona và skill từ `persona_config.json` / `skills_config.json` cũ. File hỏng (JSON sai) thì server báo lỗi chứ không ghi đè. Không xóa được profile đang dùng hoặc profile cuối cùng.
 
 ### `tours_config.json`
+
+File lưu trữ kho thông tin tour du lịch mà AI được phép sử dụng:
 
 ```json
 [
@@ -223,91 +333,46 @@ Lần đầu chạy, nếu chưa có `profiles_config.json`, server tự tạo f
 | `expiryDate` | Hạn ưu đãi (chỉ để hiển thị cho AI) |
 | `isActive` | `false` thì tour bị ẩn khỏi AI |
 
-Số tiền và thời lượng AI nói ra được đối chiếu với kho này. Nếu không khớp, câu trả lời bị chặn (xem mục 6.4).
+Số tiền và thời lượng AI nói ra được đối chiếu với kho này khi profile bật `knowledge.strictGuard`. Nếu không khớp, câu trả lời bị chặn.
 
 ### Persona và skill
 
 Persona và skill nằm trong từng profile. Form Persona (tab Knowledge), tab Skills và các API `/api/persona*`, `/api/skills*` luôn đọc/ghi **profile đang dùng**. `persona_config.json` / `skills_config.json` không còn được đọc sau lần chuyển đổi đầu tiên.
 
-> Các file `*_config.json` đang được theo dõi bởi git. Mỗi lần sửa qua Dashboard, file thay đổi và hiện trong `git status`.
+> **Lưu ý về Git:** Các file `*_config.json` đang được theo dõi bởi git. Mỗi lần sửa qua Dashboard, file thay đổi và hiện trong `git status`.
 
-## 5. Cài Chrome Extension
+---
 
-1. Mở `chrome://extensions`
-2. Bật **Developer mode** (góc trên phải)
-3. Bấm **Load unpacked** rồi chọn thư mục `salehelp/extension`
-4. (Tuỳ chọn) Ghim icon **SaleHelp** lên thanh công cụ
-5. Mở <https://chat.zalo.me> và đăng nhập. Widget 🤖 hiện ở góc màn hình
+## Tham khảo
 
-**Sau khi sửa code extension**: vào `chrome://extensions`, bấm biểu tượng tải lại ở thẻ SaleHelp, rồi **F5 tab Zalo**. Chỉ tải lại extension mà không F5 thì tab Zalo vẫn chạy bản cũ.
+### Cấu trúc thư mục
 
-### Cấu hình trong popup (bấm icon extension)
+```
+salehelp/
+├── server.js                  # Server Node.js (port 8080)
+├── .env.example               # Mẫu .env (tuỳ chọn, để trống key)
+├── settings.local.json        # (tự tạo) API key nhập từ Dashboard, KHÔNG nằm trong git
+├── tours_config.json          # Kho tour (nguồn dữ liệu AI được phép dùng)
+├── profiles_config.json       # Các profile AI (persona + skill + cách trả lời) và profile đang dùng
+├── profile_store.js           # Đọc/ghi/kiểm tra profiles_config.json
+├── persona_config.json        # (cũ) chỉ dùng để chuyển đổi sang profiles_config.json lần đầu
+├── skills_config.json         # (cũ) chỉ dùng để chuyển đổi sang profiles_config.json lần đầu
+├── package.json               # npm start / npm test / npm run lint (không có dependency)
+├── test/                      # Test tự động (node:test)
+├── web_dist/index.html        # Dashboard quản trị (1 file HTML, build sẵn)
+├── extension/                 # Chrome extension
+│   ├── manifest.json
+│   ├── content.js             # Logic chính trên Zalo Web
+│   ├── profile_prompt.js      # Dựng system prompt / tham số AI từ profile đang dùng
+│   ├── background.js          # Gọi API server hộ content script
+│   ├── popup.html / popup.js  # Cửa sổ cấu hình khi bấm icon extension
+│   └── styles.css             # Giao diện widget nổi
+└── test_zalo_oa_pure_web.js   # Test logic Zalo OA (PKCE, HMAC, refresh token)
+```
 
-| Mục | Ý nghĩa |
-|---|---|
-| Tự động trả lời | Bật/tắt auto-reply |
-| Server URL | Mặc định `http://localhost:8080` |
-| Độ trễ | Số giây chờ trước khi gửi (để giống người thật) |
-| **Lưu** | Ghi cấu hình vào `chrome.storage` |
+### API của server
 
-Popup còn có nút mở Dashboard, nút mở Zalo Web, và một nhãn trạng thái cho biết đã kết nối server hay chưa.
-
-## 6. Sử dụng
-
-### 6.1 Widget trên Zalo Web
-
-Widget nổi (kéo thả được, bấm `_` để thu nhỏ) hiển thị:
-
-- **Tự động trả lời**: công tắc bật/tắt.
-- **Skill & Knowledge**: skill đang dùng. Bấm vào để mở Dashboard sửa.
-- **Đang chat với**: tên khách ở chat đang mở và tin nhắn cuối chưa được trả lời.
-- **Hàng đợi (Queue)**: những khách khác đang nhắn mà chưa được xử lý.
-- **⚡ Trả Lời Người Này**: ép AI trả lời ngay cho chat đang mở (kể cả khi auto-reply tắt).
-- **📋 Copy**: sao chép câu AI vừa soạn để dán thủ công.
-- **Chấm trạng thái**: xanh là kết nối server tốt, đỏ là server chưa chạy.
-
-### 6.2 Luồng tự động
-
-1. Cứ mỗi 1,5 giây extension kiểm tra chat đang mở. Nếu tin cuối là của khách và chưa trả lời, nó gửi lịch sử + kho tour cho Gemini.
-2. Chờ đúng số giây "độ trễ", điền câu trả lời vào ô chat rồi gửi.
-3. Khách khác nhắn tới sẽ được thêm vào hàng đợi, và extension tự click sang chat đó sau khi chat hiện tại xong.
-
-### 6.3 Nhiều khách cùng lúc
-
-- Đang trả lời A mà B nhắn tới: B chờ trong hàng đợi, trả lời A xong mới sang B.
-- Nếu B chờ quá **20 giây**, A không được bắt đầu câu trả lời mới nữa mà nhường lượt cho B (hằng số `MAX_QUEUE_WAIT_MS` trong `content.js`).
-- Nếu bạn tự chuyển sang chat khác trong lúc AI đang chờ gửi cho A, câu trả lời **bị hủy** (không gửi nhầm cho người khác) và A được đưa lại vào hàng đợi.
-
-### 6.4 Chống bịa thông tin
-
-- AI bị yêu cầu chỉ dùng thông tin trong kho tour, nhiệt độ sinh thấp (`temperature 0.2`).
-- Trước khi gửi, extension kiểm tra mọi **số tiền** và **thời lượng (3N2Đ…)** trong câu trả lời có nằm trong kho không. Sai thì cho AI viết lại một lần. Vẫn sai thì gửi câu an toàn "em xin phép kiểm tra lại với bộ phận điều hành…" và hiện cảnh báo trên widget. Bản bị chặn được ghi ở Console của tab Zalo.
-- Kho tour trống thì không tự trả lời.
-- Giới hạn: kiểm tra chỉ bắt được sai ở giá và thời lượng, không bắt được việc bịa tên điểm tham quan hay dịch vụ.
-
-### 6.5 Trí nhớ theo từng khách
-
-- Lịch sử mỗi khách được lưu riêng (theo tên hiển thị) trong `chrome.storage` của extension, không bị lẫn giữa các khách.
-- Khi hội thoại vượt 40 tin, phần cũ được AI tóm tắt thành các ý chính (nhu cầu, thời gian, số người, ngân sách, tour quan tâm, việc cần làm, trạng thái) và đưa vào prompt. 16 tin gần nhất giữ nguyên văn. Các ngưỡng nằm ở `SUMMARIZE_THRESHOLD` và `SUMMARIZE_KEEP_RECENT` trong `content.js`.
-- Giữ tối đa 200 khách, khách lâu không nhắn bị xóa trước.
-- Hai khách trùng tên hiển thị sẽ dùng chung trí nhớ.
-- Muốn xóa trí nhớ: `chrome://extensions` → SaleHelp → *Details* → xóa dữ liệu, hoặc chạy trong Console của extension: `chrome.storage.local.remove('salehelp_memory')`.
-
-### 6.6 Dashboard (`http://localhost:8080`)
-
-| Tab | Chức năng |
-|---|---|
-| Chat | Giao diện hộp thư và chat thử với AI |
-| Profiles | Tạo (từ mẫu hoặc trống), sửa, xóa profile và chọn profile đang dùng |
-| Knowledge | Quản lý tour/ưu đãi và persona |
-| Channels | Kết nối kênh Zalo OA, Zalo cá nhân, Telegram, Facebook |
-| Skills | Tạo/sửa skill, chọn skill đang bật |
-| Webhooks | Xem log sự kiện realtime (SSE) |
-| Settings | Nhập / xóa Gemini API key |
-
-## 7. API của server
-
-Tất cả trả JSON. CORS mở `*`, nên extension và Dashboard gọi được từ mọi origin.
+Tất cả các endpoint đều trả về dữ liệu định dạng JSON. CORS được mở cho toàn bộ origin (`*`), cho phép extension và Dashboard gọi được từ mọi origin.
 
 | Method | Đường dẫn | Mô tả |
 |---|---|---|
@@ -332,7 +397,7 @@ Tất cả trả JSON. CORS mở `*`, nên extension và Dashboard gọi đượ
 | POST | `/api/facebook/send` | Gửi tin Messenger (`pageToken`, `recipientId`, `text`) |
 | GET | `/*` | File tĩnh trong `web_dist/` |
 
-## 8. Kiểm thử
+### Kiểm thử
 
 ```bash
 npm test                     # profile store, API profiles của server, dựng prompt của extension
@@ -342,7 +407,7 @@ node test_zalo_oa_pure_web.js
 
 `npm test` chạy server trong thư mục tạm (`SALEHELP_DATA_DIR`) nên không sửa file trong repo. `test_zalo_oa_pure_web.js` chạy 4 test logic Zalo OA (PKCE, chữ ký HMAC-SHA256, định tuyến nhiều OA, làm mới token), không cần mạng. Phần thao tác DOM trên Zalo Web của extension chưa có test tự động; kiểm tra bằng cách mở Zalo Web và xem Console (`F12`), log của extension bắt đầu bằng `[SaleHelp]`.
 
-## 9. Bảo mật: đọc trước khi đưa lên server thật
+### Bảo mật
 
 Server được viết để chạy **trên máy cá nhân**, và hiện:
 
@@ -356,11 +421,11 @@ Về API key:
 - Key nằm trong `settings.local.json` (quyền `0600`, bị git bỏ qua), không nằm trong source. Hai endpoint `/api/settings*` từ chối request mang `Origin` của trang web lạ, nhưng vì server không có xác thực nên **ai truy cập được cổng 8080 vẫn có thể đặt lại key hoặc dùng key đó để gọi Gemini**. Giữ server ở localhost.
 - `.env.example` là file được theo dõi bởi git, không được chứa key thật. Nếu từng commit key vào đó, hãy **thu hồi (revoke) key ở Google AI Studio và tạo key mới**, vì sửa hoặc xóa file không xóa khỏi lịch sử git.
 
-## 10. Xử lý sự cố
+### Xử lý sự cố
 
 | Triệu chứng | Nguyên nhân thường gặp / cách xử lý |
 |---|---|
-| Widget báo "Chưa bật SaleHelp Server" | Server chưa chạy hoặc sai Server URL. Chạy `node server.js`, kiểm tra `curl localhost:8080/api/persona` |
+| Widget báo "Chưa bật SaleHelp Server" | Server chưa chạy hoặc sai Server URL. Chạy `npm start` (hoặc `node server.js`), kiểm tra `curl localhost:8080/api/persona` |
 | `EADDRINUSE: address already in use :::8080` | Cổng bị chiếm. Tìm bằng `ss -ltnp \| grep 8080` rồi tắt tiến trình đó |
 | `Key loaded: No` hoặc lỗi `Chưa có Gemini API key` | Chưa nhập key. Vào Dashboard > Settings, hoặc đặt `GEMINI_API_KEY=...` trong `.env` |
 | Settings báo "Google từ chối key này" | Key sai, hết hạn hoặc bị thu hồi. Tạo key mới tại aistudio.google.com/apikey |
@@ -375,7 +440,9 @@ Về API key:
 | Thêm tour trong Dashboard nhưng AI chưa biết | Chờ ~8 giây để extension đồng bộ, hoặc F5 tab Zalo |
 | Sau khi tải lại extension, tab Zalo lỗi `Extension context invalidated` | Bình thường. F5 tab Zalo |
 
-## 11. Phát triển app Flutter (tuỳ chọn)
+---
+
+## Phát triển app Flutter (tuỳ chọn)
 
 Thư mục `app/`, `data/`, `domain/`, `shared/`, `init/`, `resources/` là app Flutter đa module quản lý bằng melos. Không cần cho server hay extension.
 
@@ -407,6 +474,8 @@ make run_dev     # chạy flavor develop (cũng có run_qa, run_stg, run_prod)
 make test        # chạy toàn bộ test
 make lint        # analyze + metrics
 ```
+
+---
 
 ## Giấy phép
 
